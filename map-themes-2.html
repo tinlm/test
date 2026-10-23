@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map Themes II</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Direction: black, white hairlines, wide-tracked caps, mono telemetry. One accent: ice blue, used once. */
+  :root{
+    --bg:#000; --panel:#07090c; --line:#242a31; --text:#f2f4f6; --muted:#7d8791; --ice:#8fd3ff;
+    --sans:'Barlow',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--sans)}
+  body{padding:0 16px 90px;max-width:820px;margin:0 auto}
+  header{padding:30px 0 16px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
+  h1{font-weight:500;font-size:34px;letter-spacing:.18em;text-transform:uppercase;margin-top:8px}
+  header p{color:var(--muted);font-size:14px;line-height:1.55;margin-top:10px;max-width:56ch}
+  .bar{position:sticky;top:0;z-index:1000;background:#000d;backdrop-filter:blur(8px);display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:22px}
+  .bar button{background:transparent;color:var(--text);border:1px solid var(--line);padding:9px 14px;font:500 12px var(--sans);letter-spacing:.16em;text-transform:uppercase}
+  .bar button.on{border-color:var(--text)}
+  .card{border:1px solid var(--line);margin-bottom:30px;background:var(--panel)}
+  .card.picked{border-color:var(--text)}
+  .head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:16px 18px 14px}
+  .head h2{font-weight:500;font-size:20px;letter-spacing:.2em;text-transform:uppercase}
+  .head p{color:var(--muted);font-size:13px;margin-top:5px;line-height:1.45;max-width:44ch}
+  .tag{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--muted)}
+  .mapwrap{position:relative}
+  .map{height:58vh;min-height:340px;width:100%;background:#000}
+  .hud{position:absolute;inset:0;z-index:500;pointer-events:none;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--hudc,#fff)}
+  .hud b{position:absolute;width:14px;height:14px;border:1px solid var(--hudc,#fff);opacity:.85}
+  .hud .tl{top:10px;left:10px;border-right:0;border-bottom:0}
+  .hud .tr{top:10px;right:10px;border-left:0;border-bottom:0}
+  .hud .bl{bottom:10px;left:10px;border-right:0;border-top:0}
+  .hud .br{bottom:10px;right:10px;border-left:0;border-top:0}
+  .hud .lab{position:absolute;top:12px;left:32px;opacity:.85}
+  .hud .xy{position:absolute;bottom:12px;left:32px;opacity:.85}
+  .hud.grid{background-image:linear-gradient(var(--gl) 1px,transparent 1px),linear-gradient(90deg,var(--gl) 1px,transparent 1px);background-size:64px 64px;--gl:rgba(143,211,255,.09)}
+  .hud.grid .cross::before,.hud.grid .cross::after{content:"";position:absolute;background:var(--hudc)}
+  .hud.grid .cross{position:absolute;left:50%;top:50%;width:0;height:0}
+  .hud.grid .cross::before{left:-18px;top:0;width:36px;height:1px;opacity:.5}
+  .hud.grid .cross::after{top:-18px;left:0;height:36px;width:1px;opacity:.5}
+  .foot{padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;border-top:1px solid var(--line)}
+  .pick{background:var(--text);color:#000;border:0;padding:11px 20px;font:600 12px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+  .card.picked .pick{background:transparent;color:var(--text);border:1px solid var(--text)}
+  .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--text);color:#000;font:600 12px var(--sans);letter-spacing:.14em;text-transform:uppercase;padding:12px 18px;z-index:2000;max-width:90vw;text-align:center;display:none}
+
+  /* Leaflet chrome restyled */
+  .leaflet-container{font-family:var(--sans);background:#000}
+  .leaflet-bar{border:1px solid #ffffff55!important;border-radius:0!important;box-shadow:none!important}
+  .leaflet-bar a{background:#000c!important;color:#fff!important;border-radius:0!important;border-bottom:1px solid #ffffff33!important;width:32px!important;height:32px!important;line-height:32px!important}
+  .leaflet-control-attribution{background:#000a!important;color:#8a949e!important;font-size:9px!important}
+  .leaflet-control-attribution a{color:#b5bec7!important}
+
+  /* markers: hairline geometry, no emoji */
+  .me{position:relative;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #000}
+  .me::after{content:"";position:absolute;inset:-9px;border:1px solid var(--ink);border-radius:50%;animation:ping 2.4s ease-out infinite}
+  @keyframes ping{from{transform:scale(.6);opacity:.9}to{transform:scale(1.5);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.me::after{animation:none}}
+  .cr{position:relative;width:26px;height:26px}
+  .cr i{position:absolute;inset:3px;border:1.5px solid var(--ink);background:var(--paper);transform:rotate(45deg)}
+  .cr i::after{content:"";position:absolute;inset:6px;background:var(--ink)}
+  .cr span{position:absolute;top:31px;left:50%;transform:translateX(-50%);white-space:nowrap;font:500 9px var(--mono);letter-spacing:.16em;color:var(--ink);text-shadow:0 0 4px var(--paper),0 0 4px var(--paper)}
+  .stop{width:18px;height:18px;border:1px solid var(--ink);background:var(--paper);display:grid;place-items:center}
+  .stop i{width:6px;height:6px;background:var(--ink)}
+</style>
+</head>
+<body>
+<header>
+  <div class="eyebrow">Wildwalk / Visual direction</div>
+  <h1>Map Themes II</h1>
+  <p>Five black and white takes on the game map. Scroll to compare, tap <b>Select</b> under your favorite, and tell me its letter.</p>
+</header>
+
+<div class="bar">
+  <button id="bLoc">My location</button>
+  <button id="bMove">Move maps: off</button>
+  <button id="bSync" class="on">Sync: on</button>
+</div>
+
+<div id="list"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const FALLBACK = {lat:45.815, lng:15.982};
+let center = {...FALLBACK};
+
+const OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const attrOSM = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const attrEsri = 'Tiles © Esri';
+const dark = (n) => ({url:ESRI+'/Canvas/World_Dark_Gray_'+n+'/MapServer/tile/{z}/{y}/{x}', o:{maxNativeZoom:16,maxZoom:19,attribution:attrEsri}});
+const light = (n) => ({url:ESRI+'/Canvas/World_Light_Gray_'+n+'/MapServer/tile/{z}/{y}/{x}', o:{maxNativeZoom:16,maxZoom:19,attribution:attrEsri}});
+
+const THEMES = [
+  { k:'A', name:'Mission Control', blurb:'Near-black ground, white hairline streets. Nothing but what matters.',
+    ink:'#ffffff', paper:'#000000', hud:'#ffffff', grid:false, ring:'#ffffff',
+    filter:'brightness(.62) contrast(1.55)', layers:[dark('Base'), dark('Reference')] },
+  { k:'B', name:'Starship', blurb:'Pure monochrome, drawn as outlines. Stainless steel on a launch pad at night.',
+    ink:'#ffffff', paper:'#000000', hud:'#ffffff', grid:false, ring:'#ffffff',
+    filter:'grayscale(1) invert(1) brightness(.78) contrast(1.7)', layers:[{url:OSM,o:{maxZoom:19,attribution:attrOSM}}] },
+  { k:'C', name:'Telemetry', blurb:'Cold blue-black with a grid and a crosshair. The flight console.',
+    ink:'#8fd3ff', paper:'#02060a', hud:'#8fd3ff', grid:true, ring:'#8fd3ff',
+    filter:'grayscale(1) sepia(1) hue-rotate(172deg) saturate(1.6) brightness(.78) contrast(1.25)', layers:[dark('Base'), dark('Reference')] },
+  { k:'D', name:'Orbit', blurb:'Satellite photos stripped to black and white, then darkened. Reconnaissance.',
+    ink:'#ffffff', paper:'#000000', hud:'#ffffff', grid:false, ring:'#ffffff',
+    filter:'grayscale(1) brightness(.55) contrast(1.4)', layers:[{url:ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}',o:{maxNativeZoom:19,maxZoom:19,attribution:attrEsri+', Maxar'}}] },
+  { k:'E', name:'Falcon', blurb:'The one light option. Bright white and pale gray, ink-black markers.',
+    ink:'#0a0c0f', paper:'#ffffff', hud:'#0a0c0f', grid:false, ring:'#0a0c0f',
+    filter:'contrast(1.12) brightness(1.02)', layers:[light('Base'), light('Reference')] }
+];
+
+const list = document.getElementById('list');
+const maps = [], groups = [], xyEls = [];
+let syncOn = true, moveOn = false, syncing = false;
+let picked = null;
+try { picked = localStorage.getItem('maptheme2.pick'); } catch(e){}
+
+const fmt = (v, p, n) => Math.abs(v).toFixed(4) + '°' + (v >= 0 ? p : n);
+function updateXY(i){
+  const c = maps[i].getCenter();
+  xyEls[i].textContent = fmt(c.lat,'N','S') + '  ' + fmt(c.lng,'E','W') + '  Z' + maps[i].getZoom();
+}
+
+THEMES.forEach((t, i) => {
+  const card = document.createElement('section');
+  card.className = 'card' + (picked === t.k ? ' picked' : '');
+  card.style.setProperty('--ink', t.ink);
+  card.style.setProperty('--paper', t.paper);
+  card.innerHTML = `
+    <div class="head"><div><h2>${t.name}</h2><p>${t.blurb}</p></div><div class="tag">${t.k}</div></div>
+    <div class="mapwrap">
+      <div class="map" id="map${i}"></div>
+      <div class="hud${t.grid ? ' grid' : ''}" style="--hudc:${t.hud}">
+        <b class="tl"></b><b class="tr"></b><b class="bl"></b><b class="br"></b>
+        <span class="lab">${t.name} / ${t.k}</span><span class="xy" id="xy${i}"></span>
+        ${t.grid ? '<div class="cross"></div>' : ''}
+      </div>
+    </div>
+    <div class="foot"><span class="tag">THEME ${t.k} OF E</span><button class="pick" data-k="${t.k}">${picked === t.k ? 'Selected' : 'Select'}</button></div>`;
+  list.appendChild(card);
+  xyEls.push(card.querySelector('#xy'+i));
+
+  const m = L.map('map'+i, {zoomControl:true, dragging:false, scrollWheelZoom:false, maxZoom:19}).setView([center.lat, center.lng], 17);
+  t.layers.forEach(l => L.tileLayer(l.url, l.o).addTo(m));
+  m.getPane('tilePane').style.filter = t.filter;
+  maps.push(m); groups.push(L.layerGroup().addTo(m));
+  updateXY(i);
+
+  m.on('moveend', () => {
+    updateXY(i);
+    if (syncing || !syncOn) return;
+    syncing = true;
+    maps.forEach(o => { if (o !== m) o.setView(m.getCenter(), m.getZoom(), {animate:false}); });
+    setTimeout(() => syncing = false, 80);
+  });
+});
+
+const icon = (html, s) => L.divIcon({className:'', html, iconSize:[s,s], iconAnchor:[s/2,s/2]});
+function placeMarkers(){
+  const c = center;
+  const items = [
+    {dy:.00055, dx:.0007,  h:'<div class="cr"><i></i><span>LUNARAY</span></div>', s:26},
+    {dy:-.0007, dx:-.0009, h:'<div class="cr"><i></i><span>DUSKFOX</span></div>', s:26},
+    {dy:.0011,  dx:-.0008, h:'<div class="cr"><i></i><span>HOOTFLARE</span></div>', s:26},
+    {dy:-.0004, dx:.0012,  h:'<div class="stop"><i></i></div>', s:18},
+    {dy:.0003,  dx:-.0014, h:'<div class="stop"><i></i></div>', s:18},
+    {dy:-.0012, dx:.0003,  h:'<div class="stop"><i></i></div>', s:18},
+    {dy:0, dx:0, h:'<div class="me"></div>', s:14}
+  ];
+  groups.forEach((g, i) => {
+    g.clearLayers();
+    L.circle([c.lat, c.lng], {radius:50, color:THEMES[i].ring, weight:1, dashArray:'3 5', fill:false, interactive:false}).addTo(g);
+    items.forEach(it => L.marker([c.lat+it.dy, c.lng+it.dx], {icon:icon(it.h, it.s), interactive:false}).addTo(g));
+  });
+}
+placeMarkers();
+
+function toast(msg){
+  const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 2400);
+}
+
+function locate(quiet){
+  if (!navigator.geolocation){ if(!quiet) toast('Location not supported'); return; }
+  navigator.geolocation.getCurrentPosition(p => {
+    center = {lat:p.coords.latitude, lng:p.coords.longitude};
+    syncing = true;
+    maps.forEach(m => m.setView([center.lat, center.lng], 17, {animate:false}));
+    setTimeout(() => syncing = false, 80);
+    placeMarkers();
+    if(!quiet) toast('Centered on you');
+  }, () => { if(!quiet) toast('Allow location in Chrome site settings'); }, {enableHighAccuracy:true, timeout:10000});
+}
+document.getElementById('bLoc').onclick = () => locate(false);
+locate(true);
+
+document.getElementById('bMove').onclick = e => {
+  moveOn = !moveOn;
+  maps.forEach(m => moveOn ? m.dragging.enable() : m.dragging.disable());
+  e.target.textContent = 'Move maps: ' + (moveOn ? 'on' : 'off');
+  e.target.classList.toggle('on', moveOn);
+};
+document.getElementById('bSync').onclick = e => {
+  syncOn = !syncOn;
+  e.target.textContent = 'Sync: ' + (syncOn ? 'on' : 'off');
+  e.target.classList.toggle('on', syncOn);
+};
+
+list.addEventListener('click', e => {
+  const b = e.target.closest('.pick'); if (!b) return;
+  const k = b.dataset.k;
+  document.querySelectorAll('.card').forEach((c, j) => {
+    const on = THEMES[j].k === k;
+    c.classList.toggle('picked', on);
+    c.querySelector('.pick').textContent = on ? 'Selected' : 'Select';
+  });
+  try { localStorage.setItem('maptheme2.pick', k); } catch(_){}
+  toast('Selected ' + k + ' · ' + THEMES.find(t => t.k === k).name);
+});
+</script>
+</body>
+</html>
