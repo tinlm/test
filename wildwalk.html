@@ -5,74 +5,120 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Wildwalk</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  :root{--bg:#0f1720;--panel:#17212c;--panel2:#1f2d3b;--text:#eaf2f8;--muted:#8fa3b5;--accent:#ffb020;--good:#3ddc97;--bad:#ff6b6b;--line:#2a3a4a}
+  /* Mission Control: black ground, white hairlines, wide-tracked caps, mono readouts. Ice blue marks only the epic tier. */
+  :root{--bg:#000;--panel:#07090c;--line:#2a3038;--hi:#ffffff66;--text:#f2f4f6;--muted:#7d8791;--ice:#8fd3ff;
+        --sans:'Barlow',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
   *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
-  html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
-  #map{position:absolute;inset:0;background:#0b1118}
-  .leaflet-container{font-family:inherit}
-  .leaflet-tile-pane{filter:invert(1) hue-rotate(200deg) brightness(.85) contrast(.9) saturate(.7)}
-  .top{position:absolute;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 10px 0;pointer-events:none}
-  .hud{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 12px;box-shadow:0 4px 16px #0006}
-  .lvl{background:var(--accent);color:#1a1200;font-weight:800;border-radius:10px;padding:4px 10px;font-size:14px;white-space:nowrap}
-  .bar{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
-  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#ff7a3d);transition:width .4s}
-  .pill{font-size:13px;white-space:nowrap}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+  button{font-family:var(--sans)}
+  #map{position:absolute;inset:0;background:#000}
+  .leaflet-container{font-family:var(--sans);background:#000}
+  .leaflet-tile-pane{filter:brightness(.62) contrast(1.55)}
+  .leaflet-control-attribution{background:#000a!important;color:#6f7983!important;font-size:9px!important;margin-bottom:78px!important}
+  .leaflet-control-attribution a{color:#a3adb7!important}
+
+  .hud{position:absolute;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 10px 0;pointer-events:none}
+  .panel{pointer-events:auto;background:#000d;border:1px solid var(--hi);padding:9px 12px 8px;backdrop-filter:blur(6px)}
+  .r1{display:flex;align-items:center;gap:12px}
+  .lvl,.orbs{font:500 12px var(--mono);letter-spacing:.18em;white-space:nowrap}
+  .bar{flex:1;height:2px;background:#ffffff26}
+  .bar i{display:block;height:100%;width:0;background:#fff;transition:width .4s}
+  .r2{display:flex;justify-content:space-between;margin-top:7px;font:400 10px var(--mono);letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+
+  .corner{position:absolute;z-index:900;width:16px;height:16px;border:1px solid #ffffffaa;pointer-events:none}
+  .c1{top:calc(max(10px,env(safe-area-inset-top)) + 70px);left:10px;border-right:0;border-bottom:0}
+  .c2{top:calc(max(10px,env(safe-area-inset-top)) + 70px);right:10px;border-left:0;border-bottom:0}
+  .c3{bottom:76px;left:10px;border-right:0;border-top:0}
+  .c4{bottom:76px;right:10px;border-left:0;border-top:0}
+
   .nav{position:absolute;left:0;right:0;bottom:0;z-index:1000;display:flex;gap:8px;padding:10px 10px max(12px,env(safe-area-inset-bottom));pointer-events:none}
-  .nav button{pointer-events:auto;flex:1;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:12px 4px;font-size:14px;font-weight:600;box-shadow:0 4px 16px #0006}
-  .nav button.on{background:var(--accent);color:#1a1200;border-color:var(--accent)}
-  .cr{font-size:34px;line-height:44px;text-align:center;width:44px;height:44px;filter:drop-shadow(0 2px 4px #000a);transition:transform .2s}
-  .cr.near{animation:bob 1s infinite;filter:drop-shadow(0 0 8px #ffb020)}
-  .cr.rare{filter:drop-shadow(0 0 10px #b46bff)}
-  @keyframes bob{50%{transform:translateY(-6px)}}
-  .stop{font-size:24px;line-height:36px;text-align:center;width:36px;height:36px;border-radius:50%;background:#1d6fd8;border:2px solid #fff;box-shadow:0 2px 6px #0008}
-  .stop.cd{background:#4b5a6a;opacity:.7}
-  .stop.near{box-shadow:0 0 0 6px #4da3ff66,0 2px 6px #0008}
-  .me{width:20px;height:20px;border-radius:50%;background:#4da3ff;border:3px solid #fff;box-shadow:0 0 0 6px #4da3ff44}
-  .toast{position:absolute;left:50%;top:22%;transform:translate(-50%,-10px);z-index:3000;background:var(--accent);color:#1a1200;padding:12px 20px;border-radius:16px;font-weight:800;font-size:17px;text-align:center;opacity:0;pointer-events:none;transition:all .3s;max-width:86vw;box-shadow:0 10px 40px #000a}
+  .nav button{pointer-events:auto;flex:1;background:#000d;color:var(--text);border:1px solid var(--hi);padding:14px 4px;font:500 12px var(--sans);letter-spacing:.22em;text-transform:uppercase;backdrop-filter:blur(6px)}
+  .nav button.on{background:#fff;color:#000;border-color:#fff}
+  .hint{position:absolute;left:10px;right:10px;bottom:70px;z-index:1000;text-align:center;font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;background:#000c;border:1px solid var(--line);padding:6px 10px;pointer-events:none;display:none}
+
+  /* map markers: hairline geometry, creatures drawn as white silhouettes */
+  .me{position:relative;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #000}
+  .me::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:50%;animation:ping 2.4s ease-out infinite}
+  @keyframes ping{from{transform:scale(.6);opacity:.9}to{transform:scale(1.5);opacity:0}}
+  .cr{position:relative;width:40px;height:40px}
+  .cr i{position:absolute;inset:7px;border:1px solid #fff;background:#000;transform:rotate(45deg)}
+  .cr.r3 i{box-shadow:0 0 0 3px #000,0 0 0 4px #fff}
+  .cr.r4 i{border-color:var(--ice);box-shadow:0 0 0 3px #000,0 0 0 4px var(--ice)}
+  .cr b{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:400;filter:brightness(0) invert(1)}
+  .cr span{display:none;position:absolute;top:42px;left:50%;transform:translateX(-50%);white-space:nowrap;font:500 9px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000}
+  .cr.near{animation:hover 1.6s ease-in-out infinite}
+  .cr.near i{background:#fff}
+  .cr.near b{filter:brightness(0)}
+  .cr.near span{display:block}
+  @keyframes hover{50%{transform:translateY(-4px)}}
+  .stop{width:24px;height:24px;border:1px solid #fff;background:#000;display:grid;place-items:center;font-size:12px}
+  .stop b{font-weight:400;filter:brightness(0) invert(1)}
+  .stop.near{background:#fff}.stop.near b{filter:brightness(0)}
+  .stop.cd{border-color:#666;opacity:.45}
+  @media (prefers-reduced-motion:reduce){.me::after,.cr.near,.beast{animation:none!important}}
+
+  .toast{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 96px);transform:translate(-50%,-6px);z-index:3000;background:#fff;color:#000;padding:12px 18px;text-align:center;opacity:0;pointer-events:none;transition:all .25s;max-width:88vw;font:600 13px var(--sans);letter-spacing:.14em;text-transform:uppercase}
   .toast.show{opacity:1;transform:translate(-50%,0)}
-  .toast small{display:block;font-weight:600;font-size:12px;margin-top:3px}
-  .modal{position:absolute;inset:0;z-index:2000;background:radial-gradient(circle at 50% 40%,#1b3a55,#0a1118);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+  .toast small{display:block;font:400 10px var(--mono);letter-spacing:.1em;margin-top:4px;text-transform:none}
+
+  .modal{position:absolute;inset:0;z-index:2000;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
   .modal.open{display:flex}
+  .info{text-align:center}
+  .info b{display:block;font:500 22px var(--sans);letter-spacing:.22em;text-transform:uppercase}
+  .info div{color:var(--muted);font:400 11px var(--mono);letter-spacing:.16em;margin-top:6px;text-transform:uppercase}
   .arena{position:relative;width:260px;height:260px}
   .arena>*{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%}
-  .target{width:80px;height:80px;border:3px dashed #3ddc97}
-  .ring{border:4px solid #ffb020;box-shadow:0 0 14px #ffb020aa}
-  .beast{font-size:64px;border:0;z-index:2;animation:bob 1.4s infinite}
-  .info{text-align:center}.info b{font-size:20px}.info div{color:var(--muted);font-size:13px;margin-top:4px}
-  .btn{border:0;border-radius:14px;padding:14px 36px;font-size:18px;font-weight:800;background:var(--accent);color:#1a1200}
-  .btn.ghost{background:var(--panel2);color:var(--text);font-size:14px;padding:10px 20px}
-  .drawer{position:absolute;inset:0;z-index:2500;background:var(--bg);padding:max(14px,env(safe-area-inset-top)) 16px 20px;overflow:auto;display:none}
+  .outer{width:250px;height:250px;border:1px solid #ffffff22}
+  .target{width:80px;height:80px;border:1px dashed #fff}
+  .ring{border:1.5px solid #fff}
+  .beast{font-size:54px;z-index:2;filter:brightness(0) invert(1);animation:float 2.4s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,calc(-50% - 6px))}}
+  .btn{border:0;padding:15px 44px;font:600 13px var(--sans);letter-spacing:.24em;text-transform:uppercase;background:#fff;color:#000}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--hi);padding:11px 24px;font-size:11px}
+
+  .drawer{position:absolute;inset:0;z-index:2500;background:#000;padding:max(16px,env(safe-area-inset-top)) 16px 24px;overflow:auto;display:none}
   .drawer.open{display:block}
-  .drawer h1{font-size:22px;margin-bottom:4px}
-  .x{position:absolute;right:14px;top:max(12px,env(safe-area-inset-top));background:none;border:0;color:var(--muted);font-size:26px}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
-  .card{background:var(--panel);border-radius:12px;padding:10px 4px;text-align:center;font-size:12px;color:var(--muted)}
-  .card .e{font-size:34px;display:block}.card b{display:block;color:var(--text);font-size:13px}
-  .card.no .e{filter:brightness(0);opacity:.35}
-  .card.r2{border:1px solid #3d8bff}.card.r3{border:1px solid #b46bff}.card.r4{border:1px solid #ffb020}
-  .row{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border-radius:12px;padding:12px;margin-top:8px;font-size:14px}
-  .sw{width:44px;height:26px;background:var(--panel2);border-radius:99px;position:relative}
-  .sw::after{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
-  .sw.on{background:var(--good)}.sw.on::after{left:21px}
-  .hint{position:absolute;left:10px;right:10px;bottom:84px;z-index:1000;text-align:center;font-size:12px;color:#fff;background:#000a;border-radius:10px;padding:6px 10px;pointer-events:none;display:none}
+  .drawer h1{font:500 22px var(--sans);letter-spacing:.24em;text-transform:uppercase;margin-bottom:2px}
+  .drawer .sub{font:400 10px var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+  .x{position:absolute;right:16px;top:max(14px,env(safe-area-inset-top));background:none;border:1px solid var(--hi);color:var(--text);width:36px;height:36px;font-size:18px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 12px}
+  .card{border:1px solid var(--line);background:var(--panel);padding:14px 4px 10px;text-align:center;font:400 9px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+  .card .e{display:block;font-size:34px;line-height:1.2;margin-bottom:8px;filter:brightness(0) invert(1)}
+  .card b{display:block;font:500 12px var(--sans);letter-spacing:.18em;color:var(--text);margin-bottom:3px}
+  .card .pips{display:block;letter-spacing:.3em;margin-bottom:4px}
+  .card.no .e{filter:brightness(0) invert(1) opacity(.14)}
+  .card.no b{color:#4a525b}
+  .card.r4:not(.no){border-color:var(--ice)}
+  .card.r4:not(.no) .pips{color:var(--ice)}
+  .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);padding:13px;margin-top:8px;font:500 11px var(--sans);letter-spacing:.18em;text-transform:uppercase}
+  .sw{width:42px;height:22px;border:1px solid var(--hi);position:relative}
+  .sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;background:#666;transition:.2s}
+  .sw.on{border-color:#fff}.sw.on::after{left:22px;background:#fff}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div class="top"><div class="hud">
-  <div class="lvl" id="lvl">Lv 1</div>
-  <div class="bar"><i id="xpbar"></i></div>
-  <div class="pill" id="orbs">🔮 10</div>
+<div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+
+<div class="hud"><div class="panel">
+  <div class="r1">
+    <div class="lvl" id="lvl">LV 01</div>
+    <div class="bar"><i id="xpbar"></i></div>
+    <div class="orbs" id="orbs">ORB 10</div>
+  </div>
+  <div class="r2"><span id="xy">--</span><span id="mode">GPS</span></div>
 </div></div>
 
-<div class="hint" id="hint">Sim mode: tap the map to move there</div>
+<div class="hint" id="hint">Sim mode · tap the map to move</div>
 
 <div class="nav">
-  <button id="bLoc">📍 Me</button>
-  <button id="bDex">📖 Dex</button>
-  <button id="bSim">🧪 Sim</button>
+  <button id="bLoc">Locate</button>
+  <button id="bDex">Dex</button>
+  <button id="bSim">Sim</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -80,20 +126,22 @@
 <div class="modal" id="catch">
   <div class="info"><b id="cName"></b><div id="cSub"></div></div>
   <div class="arena" id="arena">
+    <div class="outer"></div>
     <div class="target" id="target"></div>
     <div class="ring" id="ring"></div>
     <div class="beast" id="beast"></div>
   </div>
-  <div class="info"><div id="cTip">Tap when the ring hits the green circle</div></div>
-  <button class="btn" id="throwBtn">Throw 🔮</button>
-  <button class="btn ghost" id="runBtn">Run away</button>
+  <div class="info"><div id="cTip">Throw when the ring meets the dashed circle</div></div>
+  <button class="btn" id="throwBtn">Throw orb</button>
+  <button class="btn ghost" id="runBtn">Release</button>
 </div>
 
 <div class="drawer" id="dex">
   <button class="x" id="dexX">×</button>
   <h1 id="dexT">Dex</h1>
+  <div class="sub">Specimen log</div>
   <div class="grid" id="dexG"></div>
-  <div class="row"><span>Simulation mode (tap map to move)</span><div class="sw" id="simSw"></div></div>
+  <div class="row"><span>Simulation mode</span><div class="sw" id="simSw"></div></div>
   <div class="row"><span>Reset progress</span><button class="btn ghost" id="reset">Reset</button></div>
 </div>
 
@@ -102,10 +150,9 @@
 /* ================= Config ================= */
 const LS='wildwalk.v1';
 const CATCH_RANGE=50, STOP_RANGE=50, STOP_COOLDOWN=5*60e3;
-const WINDOW=15*60e3, CELL=0.0018;          // spawn refresh window, ~200 m cells
-const DEFAULT_POS={lat:45.815,lng:15.982};  // fallback: Zagreb
+const WINDOW=15*60e3, CELL=0.0018;
+const DEFAULT_POS={lat:45.815,lng:15.982};
 
-// Original creatures (rarity 1 common .. 4 epic)
 const SPECIES=[
  {n:'Mossling',e:'🌿',r:1},{n:'Puddlepip',e:'🐸',r:1},{n:'Bumbleroot',e:'🐝',r:1},{n:'Pebblet',e:'🪨',r:1},
  {n:'Gustling',e:'🐦',r:1},{n:'Snailwick',e:'🐌',r:1},
@@ -115,10 +162,12 @@ const SPECIES=[
 ].map((s,i)=>({...s,id:i}));
 const WEIGHT={1:60,2:28,3:10,4:2};
 const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
+const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 
 /* ================= State ================= */
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},sim:false};
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{}};
 let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
+let SIM=false;   // not saved: every launch starts on real GPS
 const save=()=>localStorage.setItem(LS,JSON.stringify(S));
 const $=id=>document.getElementById(id);
 const level=x=>Math.floor(Math.sqrt(x/100))+1;
@@ -131,24 +180,31 @@ function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1
 const hash=(a,b,c)=>{let h=2166136261;for(const v of [a,b,c]){h^=v;h=Math.imul(h,16777619);}return h>>>0;};
 let tTimer;function toast(h,ms=2200){const t=$('toast');t.innerHTML=h;t.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ms);}
 const vib=p=>navigator.vibrate&&navigator.vibrate(p);
+const fmtC=(v,p,n)=>Math.abs(v).toFixed(4)+'°'+(v>=0?p:n);
 
 /* ================= Map ================= */
-const map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:19}).setView([DEFAULT_POS.lat,DEFAULT_POS.lng],17);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',maxZoom:19}).addTo(map);
+const map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:18}).setView([DEFAULT_POS.lat,DEFAULT_POS.lng],17);
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_';
+L.tileLayer(ESRI+'Base/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:18,attribution:'Tiles © Esri'}).addTo(map);
+L.tileLayer(ESRI+'Reference/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:18}).addTo(map);
 
 let player={...DEFAULT_POS}, gotFix=false;
-const meMarker=L.marker([player.lat,player.lng],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[20,20]}),zIndexOffset:1000}).addTo(map);
-const range=L.circle([player.lat,player.lng],{radius:CATCH_RANGE,color:'#4da3ff',weight:1,fillOpacity:.06,interactive:false}).addTo(map);
+const icon=(html,s)=>L.divIcon({className:'',html,iconSize:[s,s],iconAnchor:[s/2,s/2]});
+const meMarker=L.marker([player.lat,player.lng],{icon:icon('<div class="me"></div>',14),zIndexOffset:1000,interactive:false}).addTo(map);
+const range=L.circle([player.lat,player.lng],{radius:CATCH_RANGE,color:'#fff',weight:1,dashArray:'3 5',fill:false,interactive:false}).addTo(map);
 
+function setReadout(){
+  $('xy').textContent=fmtC(player.lat,'N','S')+'  '+fmtC(player.lng,'E','W');
+  $('mode').textContent=SIM?'SIM':(gotFix?'GPS LOCK':'SEARCHING');
+}
 function setPlayer(lat,lng,pan){
   player={lat,lng};
   meMarker.setLatLng(player);range.setLatLng(player);
   if(pan)map.panTo(player);
-  refresh();maybeFetchStops();
+  setReadout();refresh();maybeFetchStops();
 }
 function onGPS(p){
-  if(S.sim)return;
+  if(SIM)return;
   const first=!gotFix;gotFix=true;
   setPlayer(p.coords.latitude,p.coords.longitude,first||document.body.dataset.follow==='1');
   if(first)map.setView(player,17);
@@ -157,11 +213,11 @@ function startGPS(){
   if(!navigator.geolocation){setSim(true);return;}
   navigator.geolocation.watchPosition(onGPS,()=>{if(!gotFix){toast('No GPS<small>Switched to simulation mode</small>',3000);setSim(true);}},{enableHighAccuracy:true,maximumAge:3000,timeout:15000});
 }
-map.on('click',e=>{if(S.sim)setPlayer(e.latlng.lat,e.latlng.lng,false);});
+map.on('click',e=>{if(SIM)setPlayer(e.latlng.lat,e.latlng.lng,false);});
 map.on('dragstart',()=>document.body.dataset.follow='0');
 
 /* ================= Spawns ================= */
-const spawnMarkers={};   // id -> marker
+const spawnMarkers={};
 function spawnsAround(center,now=Date.now()){
   const win=Math.floor(now/WINDOW), out=[];
   const ci=Math.floor(center.lat/CELL);
@@ -180,26 +236,26 @@ function spawnsAround(center,now=Date.now()){
   }
   return out;
 }
+const crHTML=(s,near)=>`<div class="cr r${s.sp.r}${near?' near':''}"><i></i><b>${s.sp.e}</b><span>${s.sp.n}</span></div>`;
 function refresh(){
   const now=Date.now(),list=spawnsAround(player,now).filter(s=>!S.gone[s.id]&&dist(player,s)<900);
   const keep=new Set(list.map(s=>s.id));
   for(const id in spawnMarkers)if(!keep.has(id)){map.removeLayer(spawnMarkers[id].m);delete spawnMarkers[id];}
   for(const s of list){
-    const near=dist(player,s)<=CATCH_RANGE, cls='cr'+(near?' near':'')+(s.sp.r>=3?' rare':'');
+    const near=dist(player,s)<=CATCH_RANGE;
     let o=spawnMarkers[s.id];
     if(!o){
-      const m=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:`<div class="${cls}">${s.sp.e}</div>`,iconSize:[44,44],iconAnchor:[22,22]})}).addTo(map);
-      m.on('click',()=>tapSpawn(s));spawnMarkers[s.id]=o={m,cls};
-    }else if(o.cls!==cls){o.cls=cls;o.m.setIcon(L.divIcon({className:'',html:`<div class="${cls}">${s.sp.e}</div>`,iconSize:[44,44],iconAnchor:[22,22]}));}
+      const m=L.marker([s.lat,s.lng],{icon:icon(crHTML(s,near),40)}).addTo(map);
+      spawnMarkers[s.id]=o={m,near};
+    }else if(o.near!==near){o.near=near;o.m.setIcon(icon(crHTML(s,near),40));}
     o.m.off('click').on('click',()=>tapSpawn(s));
   }
-  // prune old "gone" records
   for(const id in S.gone){if(S.gone[id]<now-WINDOW*2)delete S.gone[id];}
   refreshStops();
 }
 function tapSpawn(s){
   const d=dist(player,s);
-  if(d>CATCH_RANGE){toast(`${s.sp.e} ${s.sp.n} is ${Math.round(d)} m away<small>Get within ${CATCH_RANGE} m</small>`);return;}
+  if(d>CATCH_RANGE){toast(`${s.sp.n}<small>${Math.round(d)} m away · get within ${CATCH_RANGE} m</small>`);return;}
   openCatch(s);
 }
 
@@ -208,8 +264,9 @@ let cur=null,raf=null,ringR=120;
 const TARGET_R=40;
 function openCatch(s){
   cur={s,misses:0};
-  $('cName').textContent=`${s.sp.n}`;$('cSub').textContent=`${RNAME[s.sp.r]} · wild`;
+  $('cName').textContent=s.sp.n;$('cSub').textContent=`${RNAME[s.sp.r]} · ${pips(s.sp.r)}`;
   $('beast').textContent=s.sp.e;
+  $('cTip').textContent='Throw when the ring meets the dashed circle';
   $('target').style.width=$('target').style.height=TARGET_R*2+'px';
   $('catch').classList.add('open');startRing();updateHud();
 }
@@ -224,7 +281,7 @@ function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('ope
 $('runBtn').onclick=closeCatch;
 $('throwBtn').onclick=()=>{
   if(!cur)return;
-  if(S.orbs<=0){toast('Out of orbs 🔮<small>Visit blue stops to get more</small>',2600);closeCatch();return;}
+  if(S.orbs<=0){toast('Out of orbs<small>Visit a stop to resupply</small>',2600);closeCatch();return;}
   S.orbs--;
   const tol=22-cur.s.sp.r*3, off=Math.abs(ringR-TARGET_R);
   if(off<=tol){
@@ -234,12 +291,12 @@ $('throwBtn').onclick=()=>{
     const old=level(S.xp),xp=40*sp.r+(d.count===1?100:0)+(great?25:0);S.xp+=xp;
     S.gone[cur.s.id]=Date.now();save();
     vib([60,40,120]);
-    toast(`${sp.e} ${great?'Great! ':''}Caught ${sp.n}!<small>CP ${cp} · +${xp} XP${d.count===1?' · NEW in dex':''}${level(S.xp)>old?` · Level ${level(S.xp)}!`:''}</small>`,3200);
+    toast(`${great?'Perfect · ':''}Captured ${sp.n}<small>CP ${cp} · +${xp} XP${d.count===1?' · new specimen':''}${level(S.xp)>old?` · level ${level(S.xp)}`:''}</small>`,3200);
     closeCatch();
   }else{
     cur.misses++;vib(80);
-    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(`${cur.s.sp.e} ran away!`);closeCatch();}
-    else{$('cTip').textContent=`Missed! ${3-cur.misses} tries left`;save();}
+    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(`${cur.s.sp.n} escaped`);closeCatch();}
+    else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
   }
   updateHud();
 };
@@ -247,7 +304,7 @@ $('throwBtn').onclick=()=>{
 /* ================= Stops (OpenStreetMap via Overpass) ================= */
 let stops=[],stopMarkers={},lastFetch=null,fetching=false,warned=false;
 const STOP_EMOJI={museum:'🏛️',artwork:'🎨',viewpoint:'🔭',attraction:'⭐',gallery:'🖼️',park:'🌳',cafe:'☕',library:'📚',fountain:'⛲',place_of_worship:'⛪',monument:'🗿',memorial:'🕯️'};
-function stopEmoji(t){for(const k of [t.tourism,t.leisure,t.amenity,t.historic])if(k&&STOP_EMOJI[k])return STOP_EMOJI[k];return '🔷';}
+function stopEmoji(t){for(const k of [t.tourism,t.leisure,t.amenity,t.historic])if(k&&STOP_EMOJI[k])return STOP_EMOJI[k];return '◆';}
 async function maybeFetchStops(){
   if(fetching)return;
   if(lastFetch&&dist(player,lastFetch)<300)return;
@@ -266,40 +323,42 @@ async function maybeFetchStops(){
   }catch(e){if(!warned){warned=true;toast('Could not load stops<small>Check your connection</small>',2800);}}
   fetching=false;
 }
+const stopHTML=(s,cd,near)=>`<div class="stop${cd?' cd':''}${near&&!cd?' near':''}"><b>${s.e}</b></div>`;
 function refreshStops(){
   const now=Date.now(),ids=new Set(stops.map(s=>s.id));
   for(const id in stopMarkers)if(!ids.has(id)){map.removeLayer(stopMarkers[id]);delete stopMarkers[id];}
   for(const s of stops){
     const cd=(S.stopCd[s.id]||0)>now-STOP_COOLDOWN, near=dist(player,s)<=STOP_RANGE;
-    const html=`<div class="stop${cd?' cd':''}${near&&!cd?' near':''}">${s.e}</div>`;
-    const icon=L.divIcon({className:'',html,iconSize:[36,36],iconAnchor:[18,18]});
-    if(!stopMarkers[s.id]){stopMarkers[s.id]=L.marker([s.lat,s.lng],{icon}).addTo(map).on('click',()=>tapStop(s));}
-    else stopMarkers[s.id].setIcon(icon);
+    const ic=icon(stopHTML(s,cd,near),24);
+    if(!stopMarkers[s.id]){stopMarkers[s.id]=L.marker([s.lat,s.lng],{icon:ic}).addTo(map).on('click',()=>tapStop(s));}
+    else stopMarkers[s.id].setIcon(ic);
   }
 }
 function tapStop(s){
   const d=dist(player,s);
-  if(d>STOP_RANGE){toast(`${s.e} ${s.name}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
+  if(d>STOP_RANGE){toast(`${s.name}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
   const last=S.stopCd[s.id]||0,left=STOP_COOLDOWN-(Date.now()-last);
-  if(left>0){toast(`${s.name}<small>Recharging: ${Math.ceil(left/60000)} min</small>`);return;}
+  if(left>0){toast(`${s.name}<small>Recharging · ${Math.ceil(left/60000)} min</small>`);return;}
   const n=3+Math.floor(Math.random()*3),xp=25;
   S.orbs+=n;S.xp+=xp;S.stopCd[s.id]=Date.now();save();vib(60);
-  toast(`${s.e} ${s.name}<small>+${n} 🔮 orbs · +${xp} XP</small>`,2800);
+  toast(`${s.name}<small>+${n} orbs · +${xp} XP</small>`,2800);
   updateHud();refreshStops();
 }
 
 /* ================= HUD / Dex ================= */
 function updateHud(){
   const l=level(S.xp),a=lvStart(l),b=lvStart(l+1);
-  $('lvl').textContent='Lv '+l;$('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';$('orbs').textContent='🔮 '+S.orbs;
+  $('lvl').textContent='LV '+String(l).padStart(2,'0');
+  $('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';
+  $('orbs').textContent='ORB '+S.orbs;
   save();
 }
 function renderDex(){
   const have=Object.keys(S.dex).length;
-  $('dexT').textContent=`Dex ${have}/${SPECIES.length}`;
+  $('dexT').textContent=`Dex ${String(have).padStart(2,'0')}/${SPECIES.length}`;
   $('dexG').innerHTML=SPECIES.map(s=>{const d=S.dex[s.id];
-    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'???'}</b>${d?`CP ${d.best} · ×${d.count}`:RNAME[s.r]}</div>`;}).join('');
-  $('simSw').classList.toggle('on',S.sim);
+    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'Unknown'}</b><span class="pips">${pips(s.r)}</span>${d?`CP ${d.best} · x${d.count}`:RNAME[s.r]}</div>`;}).join('');
+  $('simSw').classList.toggle('on',SIM);
 }
 $('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
 $('dexX').onclick=()=>$('dex').classList.remove('open');
@@ -307,18 +366,18 @@ $('reset').onclick=()=>{if(confirm('Reset all progress?')){localStorage.removeIt
 $('bLoc').onclick=()=>{document.body.dataset.follow='1';map.setView(player,Math.max(map.getZoom(),17));};
 
 function setSim(on){
-  S.sim=on;save();
+  SIM=on;
   $('bSim').classList.toggle('on',on);$('hint').style.display=on?'block':'none';
-  $('simSw').classList.toggle('on',on);
+  $('simSw').classList.toggle('on',on);setReadout();
 }
-$('bSim').onclick=()=>setSim(!S.sim);
-$('simSw').onclick=()=>setSim(!S.sim);
+$('bSim').onclick=()=>setSim(!SIM);
+$('simSw').onclick=()=>setSim(!SIM);
 
 /* ================= Boot ================= */
 document.body.dataset.follow='1';
-updateHud();setSim(S.sim);
+updateHud();setSim(false);
 refresh();maybeFetchStops();
-if(!S.sim)startGPS();else{navigator.geolocation&&startGPS();}
+startGPS();
 setInterval(refresh,10000);
 </script>
 </body>
