@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Wildwalk</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root{--bg:#0f1720;--panel:#17212c;--panel2:#1f2d3b;--text:#eaf2f8;--muted:#8fa3b5;--accent:#ffb020;--good:#3ddc97;--bad:#ff6b6b;--line:#2a3a4a}
+  *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  #map{position:absolute;inset:0;background:#0b1118}
+  .leaflet-container{font-family:inherit}
+  .top{position:absolute;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 10px 0;pointer-events:none}
+  .hud{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 12px;box-shadow:0 4px 16px #0006}
+  .lvl{background:var(--accent);color:#1a1200;font-weight:800;border-radius:10px;padding:4px 10px;font-size:14px;white-space:nowrap}
+  .bar{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
+  .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),#ff7a3d);transition:width .4s}
+  .pill{font-size:13px;white-space:nowrap}
+  .nav{position:absolute;left:0;right:0;bottom:0;z-index:1000;display:flex;gap:8px;padding:10px 10px max(12px,env(safe-area-inset-bottom));pointer-events:none}
+  .nav button{pointer-events:auto;flex:1;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:12px 4px;font-size:14px;font-weight:600;box-shadow:0 4px 16px #0006}
+  .nav button.on{background:var(--accent);color:#1a1200;border-color:var(--accent)}
+  .cr{font-size:34px;line-height:44px;text-align:center;width:44px;height:44px;filter:drop-shadow(0 2px 4px #000a);transition:transform .2s}
+  .cr.near{animation:bob 1s infinite;filter:drop-shadow(0 0 8px #ffb020)}
+  .cr.rare{filter:drop-shadow(0 0 10px #b46bff)}
+  @keyframes bob{50%{transform:translateY(-6px)}}
+  .stop{font-size:24px;line-height:36px;text-align:center;width:36px;height:36px;border-radius:50%;background:#1d6fd8;border:2px solid #fff;box-shadow:0 2px 6px #0008}
+  .stop.cd{background:#4b5a6a;opacity:.7}
+  .stop.near{box-shadow:0 0 0 6px #4da3ff66,0 2px 6px #0008}
+  .me{width:20px;height:20px;border-radius:50%;background:#4da3ff;border:3px solid #fff;box-shadow:0 0 0 6px #4da3ff44}
+  .toast{position:absolute;left:50%;top:22%;transform:translate(-50%,-10px);z-index:3000;background:var(--accent);color:#1a1200;padding:12px 20px;border-radius:16px;font-weight:800;font-size:17px;text-align:center;opacity:0;pointer-events:none;transition:all .3s;max-width:86vw;box-shadow:0 10px 40px #000a}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast small{display:block;font-weight:600;font-size:12px;margin-top:3px}
+  .modal{position:absolute;inset:0;z-index:2000;background:radial-gradient(circle at 50% 40%,#1b3a55,#0a1118);display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px}
+  .modal.open{display:flex}
+  .arena{position:relative;width:260px;height:260px}
+  .arena>*{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%}
+  .target{width:80px;height:80px;border:3px dashed #3ddc97}
+  .ring{border:4px solid #ffb020;box-shadow:0 0 14px #ffb020aa}
+  .beast{font-size:64px;border:0;z-index:2;animation:bob 1.4s infinite}
+  .info{text-align:center}.info b{font-size:20px}.info div{color:var(--muted);font-size:13px;margin-top:4px}
+  .btn{border:0;border-radius:14px;padding:14px 36px;font-size:18px;font-weight:800;background:var(--accent);color:#1a1200}
+  .btn.ghost{background:var(--panel2);color:var(--text);font-size:14px;padding:10px 20px}
+  .drawer{position:absolute;inset:0;z-index:2500;background:var(--bg);padding:max(14px,env(safe-area-inset-top)) 16px 20px;overflow:auto;display:none}
+  .drawer.open{display:block}
+  .drawer h1{font-size:22px;margin-bottom:4px}
+  .x{position:absolute;right:14px;top:max(12px,env(safe-area-inset-top));background:none;border:0;color:var(--muted);font-size:26px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .card{background:var(--panel);border-radius:12px;padding:10px 4px;text-align:center;font-size:12px;color:var(--muted)}
+  .card .e{font-size:34px;display:block}.card b{display:block;color:var(--text);font-size:13px}
+  .card.no .e{filter:brightness(0);opacity:.35}
+  .card.r2{border:1px solid #3d8bff}.card.r3{border:1px solid #b46bff}.card.r4{border:1px solid #ffb020}
+  .row{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border-radius:12px;padding:12px;margin-top:8px;font-size:14px}
+  .sw{width:44px;height:26px;background:var(--panel2);border-radius:99px;position:relative}
+  .sw::after{content:'';position:absolute;left:3px;top:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+  .sw.on{background:var(--good)}.sw.on::after{left:21px}
+  .hint{position:absolute;left:10px;right:10px;bottom:84px;z-index:1000;text-align:center;font-size:12px;color:#fff;background:#000a;border-radius:10px;padding:6px 10px;pointer-events:none;display:none}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top"><div class="hud">
+  <div class="lvl" id="lvl">Lv 1</div>
+  <div class="bar"><i id="xpbar"></i></div>
+  <div class="pill" id="orbs">🔮 10</div>
+</div></div>
+
+<div class="hint" id="hint">Sim mode: tap the map to move there</div>
+
+<div class="nav">
+  <button id="bLoc">📍 Me</button>
+  <button id="bDex">📖 Dex</button>
+  <button id="bSim">🧪 Sim</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="catch">
+  <div class="info"><b id="cName"></b><div id="cSub"></div></div>
+  <div class="arena" id="arena">
+    <div class="target" id="target"></div>
+    <div class="ring" id="ring"></div>
+    <div class="beast" id="beast"></div>
+  </div>
+  <div class="info"><div id="cTip">Tap when the ring hits the green circle</div></div>
+  <button class="btn" id="throwBtn">Throw 🔮</button>
+  <button class="btn ghost" id="runBtn">Run away</button>
+</div>
+
+<div class="drawer" id="dex">
+  <button class="x" id="dexX">×</button>
+  <h1 id="dexT">Dex</h1>
+  <div class="grid" id="dexG"></div>
+  <div class="row"><span>Simulation mode (tap map to move)</span><div class="sw" id="simSw"></div></div>
+  <div class="row"><span>Reset progress</span><button class="btn ghost" id="reset">Reset</button></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================= Config ================= */
+const LS='wildwalk.v1';
+const CATCH_RANGE=50, STOP_RANGE=50, STOP_COOLDOWN=5*60e3;
+const WINDOW=15*60e3, CELL=0.0018;          // spawn refresh window, ~200 m cells
+const DEFAULT_POS={lat:45.815,lng:15.982};  // fallback: Zagreb
+
+// Original creatures (rarity 1 common .. 4 epic)
+const SPECIES=[
+ {n:'Mossling',e:'🌿',r:1},{n:'Puddlepip',e:'🐸',r:1},{n:'Bumbleroot',e:'🐝',r:1},{n:'Pebblet',e:'🪨',r:1},
+ {n:'Gustling',e:'🐦',r:1},{n:'Snailwick',e:'🐌',r:1},
+ {n:'Glimmoth',e:'🦋',r:2},{n:'Frostnib',e:'🐧',r:2},{n:'Sparkit',e:'🐹',r:2},{n:'Duskfox',e:'🦊',r:2},
+ {n:'Cragon',e:'🐲',r:3},{n:'Tidalume',e:'🐙',r:3},{n:'Hootflare',e:'🦉',r:3},
+ {n:'Lunaray',e:'🦄',r:4},{n:'Solwing',e:'🦅',r:4}
+].map((s,i)=>({...s,id:i}));
+const WEIGHT={1:60,2:28,3:10,4:2};
+const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
+
+/* ================= State ================= */
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},sim:false};
+let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
+const save=()=>localStorage.setItem(LS,JSON.stringify(S));
+const $=id=>document.getElementById(id);
+const level=x=>Math.floor(Math.sqrt(x/100))+1;
+const lvStart=l=>(l-1)*(l-1)*100;
+
+/* ================= Helpers ================= */
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dg=r(b.lng-a.lng);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const hash=(a,b,c)=>{let h=2166136261;for(const v of [a,b,c]){h^=v;h=Math.imul(h,16777619);}return h>>>0;};
+let tTimer;function toast(h,ms=2200){const t=$('toast');t.innerHTML=h;t.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ms);}
+const vib=p=>navigator.vibrate&&navigator.vibrate(p);
+
+/* ================= Map ================= */
+const map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:19}).setView([DEFAULT_POS.lat,DEFAULT_POS.lng],17);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',maxZoom:19}).addTo(map);
+
+let player={...DEFAULT_POS}, gotFix=false;
+const meMarker=L.marker([player.lat,player.lng],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[20,20]}),zIndexOffset:1000}).addTo(map);
+const range=L.circle([player.lat,player.lng],{radius:CATCH_RANGE,color:'#4da3ff',weight:1,fillOpacity:.06,interactive:false}).addTo(map);
+
+function setPlayer(lat,lng,pan){
+  player={lat,lng};
+  meMarker.setLatLng(player);range.setLatLng(player);
+  if(pan)map.panTo(player);
+  refresh();maybeFetchStops();
+}
+function onGPS(p){
+  if(S.sim)return;
+  const first=!gotFix;gotFix=true;
+  setPlayer(p.coords.latitude,p.coords.longitude,first||document.body.dataset.follow==='1');
+  if(first)map.setView(player,17);
+}
+function startGPS(){
+  if(!navigator.geolocation){setSim(true);return;}
+  navigator.geolocation.watchPosition(onGPS,()=>{if(!gotFix){toast('No GPS<small>Switched to simulation mode</small>',3000);setSim(true);}},{enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+}
+map.on('click',e=>{if(S.sim)setPlayer(e.latlng.lat,e.latlng.lng,false);});
+map.on('dragstart',()=>document.body.dataset.follow='0');
+
+/* ================= Spawns ================= */
+const spawnMarkers={};   // id -> marker
+function spawnsAround(center,now=Date.now()){
+  const win=Math.floor(now/WINDOW), out=[];
+  const ci=Math.floor(center.lat/CELL);
+  for(let i=ci-4;i<=ci+4;i++){
+    const latC=(i+.5)*CELL, lngSize=CELL/Math.cos(latC*Math.PI/180);
+    const cj=Math.floor(center.lng/lngSize);
+    for(let j=cj-5;j<=cj+5;j++){
+      const rnd=mulberry(hash(i,j,win)), c=rnd(), n=c<.3?0:c<.8?1:2;
+      for(let k=0;k<n;k++){
+        let w=rnd()*100,r=4;for(const rr of [1,2,3,4]){w-=WEIGHT[rr];if(w<0){r=rr;break;}}
+        const pool=SPECIES.filter(s=>s.r===r),sp=pool[Math.floor(rnd()*pool.length)];
+        const id=`${i}_${j}_${win}_${k}`;
+        out.push({id,sp,lat:i*CELL+rnd()*CELL,lng:j*lngSize+rnd()*lngSize,expires:(win+1)*WINDOW});
+      }
+    }
+  }
+  return out;
+}
+function refresh(){
+  const now=Date.now(),list=spawnsAround(player,now).filter(s=>!S.gone[s.id]&&dist(player,s)<900);
+  const keep=new Set(list.map(s=>s.id));
+  for(const id in spawnMarkers)if(!keep.has(id)){map.removeLayer(spawnMarkers[id].m);delete spawnMarkers[id];}
+  for(const s of list){
+    const near=dist(player,s)<=CATCH_RANGE, cls='cr'+(near?' near':'')+(s.sp.r>=3?' rare':'');
+    let o=spawnMarkers[s.id];
+    if(!o){
+      const m=L.marker([s.lat,s.lng],{icon:L.divIcon({className:'',html:`<div class="${cls}">${s.sp.e}</div>`,iconSize:[44,44],iconAnchor:[22,22]})}).addTo(map);
+      m.on('click',()=>tapSpawn(s));spawnMarkers[s.id]=o={m,cls};
+    }else if(o.cls!==cls){o.cls=cls;o.m.setIcon(L.divIcon({className:'',html:`<div class="${cls}">${s.sp.e}</div>`,iconSize:[44,44],iconAnchor:[22,22]}));}
+    o.m.off('click').on('click',()=>tapSpawn(s));
+  }
+  // prune old "gone" records
+  for(const id in S.gone){if(S.gone[id]<now-WINDOW*2)delete S.gone[id];}
+  refreshStops();
+}
+function tapSpawn(s){
+  const d=dist(player,s);
+  if(d>CATCH_RANGE){toast(`${s.sp.e} ${s.sp.n} is ${Math.round(d)} m away<small>Get within ${CATCH_RANGE} m</small>`);return;}
+  openCatch(s);
+}
+
+/* ================= Catch minigame ================= */
+let cur=null,raf=null,ringR=120;
+const TARGET_R=40;
+function openCatch(s){
+  cur={s,misses:0};
+  $('cName').textContent=`${s.sp.n}`;$('cSub').textContent=`${RNAME[s.sp.r]} · wild`;
+  $('beast').textContent=s.sp.e;
+  $('target').style.width=$('target').style.height=TARGET_R*2+'px';
+  $('catch').classList.add('open');startRing();updateHud();
+}
+function startRing(){
+  cancelAnimationFrame(raf);const t0=performance.now();
+  const speed=1500-cur.s.sp.r*180;
+  const step=t=>{const p=((t-t0)%speed)/speed;ringR=125-(125-16)*p;
+    const r=$('ring');r.style.width=r.style.height=ringR*2+'px';raf=requestAnimationFrame(step);};
+  raf=requestAnimationFrame(step);
+}
+function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
+$('runBtn').onclick=closeCatch;
+$('throwBtn').onclick=()=>{
+  if(!cur)return;
+  if(S.orbs<=0){toast('Out of orbs 🔮<small>Visit blue stops to get more</small>',2600);closeCatch();return;}
+  S.orbs--;
+  const tol=22-cur.s.sp.r*3, off=Math.abs(ringR-TARGET_R);
+  if(off<=tol){
+    const sp=cur.s.sp,great=off<=tol/3;
+    const cp=Math.round(sp.r*120+Math.random()*180+(great?40:0));
+    const d=S.dex[sp.id]||{count:0,best:0};d.count++;d.best=Math.max(d.best,cp);S.dex[sp.id]=d;
+    const old=level(S.xp),xp=40*sp.r+(d.count===1?100:0)+(great?25:0);S.xp+=xp;
+    S.gone[cur.s.id]=Date.now();save();
+    vib([60,40,120]);
+    toast(`${sp.e} ${great?'Great! ':''}Caught ${sp.n}!<small>CP ${cp} · +${xp} XP${d.count===1?' · NEW in dex':''}${level(S.xp)>old?` · Level ${level(S.xp)}!`:''}</small>`,3200);
+    closeCatch();
+  }else{
+    cur.misses++;vib(80);
+    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(`${cur.s.sp.e} ran away!`);closeCatch();}
+    else{$('cTip').textContent=`Missed! ${3-cur.misses} tries left`;save();}
+  }
+  updateHud();
+};
+
+/* ================= Stops (OpenStreetMap via Overpass) ================= */
+let stops=[],stopMarkers={},lastFetch=null,fetching=false,warned=false;
+const STOP_EMOJI={museum:'🏛️',artwork:'🎨',viewpoint:'🔭',attraction:'⭐',gallery:'🖼️',park:'🌳',cafe:'☕',library:'📚',fountain:'⛲',place_of_worship:'⛪',monument:'🗿',memorial:'🕯️'};
+function stopEmoji(t){for(const k of [t.tourism,t.leisure,t.amenity,t.historic])if(k&&STOP_EMOJI[k])return STOP_EMOJI[k];return '🔷';}
+async function maybeFetchStops(){
+  if(fetching)return;
+  if(lastFetch&&dist(player,lastFetch)<300)return;
+  const key='ww.stops.'+player.lat.toFixed(3)+'.'+player.lng.toFixed(3);
+  const cached=localStorage.getItem(key);
+  if(cached){stops=JSON.parse(cached);lastFetch={...player};refreshStops();return;}
+  fetching=true;
+  const a=`(around:700,${player.lat},${player.lng})`;
+  const q=`[out:json][timeout:20];(node${a}[tourism~"museum|artwork|viewpoint|attraction|gallery"];node${a}[leisure=park];node${a}[amenity~"cafe|library|fountain|place_of_worship"];node${a}[historic~"monument|memorial"];);out 40;`;
+  try{
+    const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+    const j=await r.json();
+    stops=j.elements.map(e=>({id:'n'+e.id,lat:e.lat,lng:e.lon,name:e.tags.name||'Landmark',e:stopEmoji(e.tags)}));
+    try{localStorage.setItem(key,JSON.stringify(stops));}catch(_){}
+    lastFetch={...player};refreshStops();
+  }catch(e){if(!warned){warned=true;toast('Could not load stops<small>Check your connection</small>',2800);}}
+  fetching=false;
+}
+function refreshStops(){
+  const now=Date.now(),ids=new Set(stops.map(s=>s.id));
+  for(const id in stopMarkers)if(!ids.has(id)){map.removeLayer(stopMarkers[id]);delete stopMarkers[id];}
+  for(const s of stops){
+    const cd=(S.stopCd[s.id]||0)>now-STOP_COOLDOWN, near=dist(player,s)<=STOP_RANGE;
+    const html=`<div class="stop${cd?' cd':''}${near&&!cd?' near':''}">${s.e}</div>`;
+    const icon=L.divIcon({className:'',html,iconSize:[36,36],iconAnchor:[18,18]});
+    if(!stopMarkers[s.id]){stopMarkers[s.id]=L.marker([s.lat,s.lng],{icon}).addTo(map).on('click',()=>tapStop(s));}
+    else stopMarkers[s.id].setIcon(icon);
+  }
+}
+function tapStop(s){
+  const d=dist(player,s);
+  if(d>STOP_RANGE){toast(`${s.e} ${s.name}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
+  const last=S.stopCd[s.id]||0,left=STOP_COOLDOWN-(Date.now()-last);
+  if(left>0){toast(`${s.name}<small>Recharging: ${Math.ceil(left/60000)} min</small>`);return;}
+  const n=3+Math.floor(Math.random()*3),xp=25;
+  S.orbs+=n;S.xp+=xp;S.stopCd[s.id]=Date.now();save();vib(60);
+  toast(`${s.e} ${s.name}<small>+${n} 🔮 orbs · +${xp} XP</small>`,2800);
+  updateHud();refreshStops();
+}
+
+/* ================= HUD / Dex ================= */
+function updateHud(){
+  const l=level(S.xp),a=lvStart(l),b=lvStart(l+1);
+  $('lvl').textContent='Lv '+l;$('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';$('orbs').textContent='🔮 '+S.orbs;
+  save();
+}
+function renderDex(){
+  const have=Object.keys(S.dex).length;
+  $('dexT').textContent=`Dex ${have}/${SPECIES.length}`;
+  $('dexG').innerHTML=SPECIES.map(s=>{const d=S.dex[s.id];
+    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'???'}</b>${d?`CP ${d.best} · ×${d.count}`:RNAME[s.r]}</div>`;}).join('');
+  $('simSw').classList.toggle('on',S.sim);
+}
+$('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
+$('dexX').onclick=()=>$('dex').classList.remove('open');
+$('reset').onclick=()=>{if(confirm('Reset all progress?')){localStorage.removeItem(LS);location.reload();}};
+$('bLoc').onclick=()=>{document.body.dataset.follow='1';map.setView(player,Math.max(map.getZoom(),17));};
+
+function setSim(on){
+  S.sim=on;save();
+  $('bSim').classList.toggle('on',on);$('hint').style.display=on?'block':'none';
+  $('simSw').classList.toggle('on',on);
+}
+$('bSim').onclick=()=>setSim(!S.sim);
+$('simSw').onclick=()=>setSim(!S.sim);
+
+/* ================= Boot ================= */
+document.body.dataset.follow='1';
+updateHud();setSim(S.sim);
+refresh();maybeFetchStops();
+if(!S.sim)startGPS();else{navigator.geolocation&&startGPS();}
+setInterval(refresh,10000);
+</script>
+</body>
+</html>
