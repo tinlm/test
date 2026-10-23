@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Wildwalk</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Mission Control: black ground, white hairlines, tracked caps, mono readouts. Ice blue is reserved for epic creatures. */
+  :root{
+    --bg:#000; --panel:#050608; --line:#2a3038; --text:#f2f4f6; --muted:#7d8791; --ice:#8fd3ff;
+    --sans:'Barlow',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+  #map{position:absolute;inset:0;background:#000}
+  .leaflet-container{font-family:var(--sans);background:#000}
+  .leaflet-tile-pane{filter:brightness(.62) contrast(1.55)}
+  .leaflet-control-attribution{background:#000a!important;color:#6d7780!important;font-size:9px!important;margin-bottom:68px!important}
+  .leaflet-control-attribution a{color:#9aa4ad!important}
+
+  /* frame: corner brackets */
+  .frame{position:absolute;inset:0;z-index:900;pointer-events:none}
+  .frame b{position:absolute;width:16px;height:16px;border:1px solid #fff;opacity:.8}
+  .frame .tl{top:calc(84px + env(safe-area-inset-top,0px));left:12px;border-right:0;border-bottom:0}
+  .frame .tr{top:calc(84px + env(safe-area-inset-top,0px));right:12px;border-left:0;border-bottom:0}
+  .frame .bl{bottom:calc(76px + env(safe-area-inset-bottom,0px));left:12px;border-right:0;border-top:0}
+  .frame .br{bottom:calc(76px + env(safe-area-inset-bottom,0px));right:12px;border-left:0;border-top:0}
+  .xy{position:absolute;left:34px;bottom:calc(80px + env(safe-area-inset-bottom,0px));font:400 10px var(--mono);letter-spacing:.14em;color:#fff;opacity:.85;text-shadow:0 0 6px #000;text-transform:uppercase}
+
+  /* top HUD */
+  .top{position:absolute;top:0;left:0;right:0;z-index:1000;padding:calc(10px + env(safe-area-inset-top,0px)) 12px 0;pointer-events:none}
+  .hud{pointer-events:auto;display:flex;align-items:center;gap:14px;background:#000d;backdrop-filter:blur(6px);border:1px solid #ffffff55;padding:11px 14px}
+  .lvl{font:500 13px var(--mono);letter-spacing:.16em;white-space:nowrap}
+  .bar{flex:1;height:2px;background:#ffffff26;position:relative}
+  .bar i{position:absolute;left:0;top:0;bottom:0;width:0;background:#fff;transition:width .4s}
+  .orbs{font:500 13px var(--mono);letter-spacing:.14em;white-space:nowrap}
+  .orbs small{color:var(--muted);font-size:10px;margin-right:6px}
+
+  /* bottom nav */
+  .nav{position:absolute;left:0;right:0;bottom:0;z-index:1000;display:flex;gap:8px;padding:10px 12px calc(12px + env(safe-area-inset-bottom,0px));pointer-events:none}
+  .nav button{pointer-events:auto;flex:1;background:#000d;color:#fff;border:1px solid #ffffff55;padding:14px 4px;font:500 12px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+  .nav button.on{background:#fff;color:#000;border-color:#fff}
+  .hint{position:absolute;left:12px;right:12px;bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:1000;text-align:center;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#fff;background:#000c;border:1px solid #ffffff33;padding:7px 10px;pointer-events:none;display:none}
+
+  /* markers */
+  .me{position:relative;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #000}
+  .me::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:50%;animation:ping 2.4s ease-out infinite}
+  @keyframes ping{from{transform:scale(.6);opacity:.9}to{transform:scale(1.5);opacity:0}}
+  .cr{position:relative;width:30px;height:30px}
+  .cr i{position:absolute;inset:5px;border:1px solid #fff;background:#000;transform:rotate(45deg)}
+  .cr.r2 i::after{content:"";position:absolute;inset:4px;background:#fff}
+  .cr.r3 i{border-width:1.5px;box-shadow:0 0 0 3px #000,0 0 0 4px #fff}
+  .cr.r3 i::after{content:"";position:absolute;inset:4px;background:#fff}
+  .cr.r4 i{border-color:var(--ice);border-width:1.5px;box-shadow:0 0 14px var(--ice),0 0 0 3px #000,0 0 0 4px var(--ice)}
+  .cr.r4 i::after{content:"";position:absolute;inset:4px;background:var(--ice)}
+  .cr span{position:absolute;top:34px;left:50%;transform:translateX(-50%);white-space:nowrap;font:500 9px var(--mono);letter-spacing:.16em;text-shadow:0 0 5px #000,0 0 5px #000;opacity:.8}
+  .cr.near i{animation:pulse 1.1s ease-in-out infinite}
+  .cr.near span{opacity:1}
+  @keyframes pulse{50%{transform:rotate(45deg) scale(1.18)}}
+  .stop{width:22px;height:22px;border:1px solid #fff;background:#000;display:grid;place-items:center}
+  .stop i{width:6px;height:6px;background:#fff}
+  .stop.near{box-shadow:0 0 0 4px #000,0 0 0 5px #fff}
+  .stop.cd{border-style:dashed;opacity:.45}
+  .stop.cd i{background:transparent}
+
+  /* toast */
+  .toast{position:absolute;left:50%;top:calc(96px + env(safe-area-inset-top,0px));transform:translate(-50%,-8px);z-index:3000;background:#000;border:1px solid #fff;color:#fff;padding:12px 18px;text-align:center;opacity:0;pointer-events:none;transition:all .25s;max-width:88vw;min-width:200px}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast b{display:block;font:600 13px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+  .toast small{display:block;font:400 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;margin-top:6px;color:#c4ccd3}
+
+  /* catch screen */
+  .modal{position:absolute;inset:0;z-index:2000;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px}
+  .modal.open{display:flex}
+  .info{text-align:center}
+  .info b{display:block;font:500 22px var(--sans);letter-spacing:.24em;text-transform:uppercase}
+  .info div{font:400 11px var(--mono);letter-spacing:.18em;color:var(--muted);margin-top:8px;text-transform:uppercase}
+  .arena{position:relative;width:260px;height:260px;margin:6px 0}
+  .arena>*{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%}
+  .a1{width:260px;height:260px;border:1px solid #ffffff1f}
+  .a2{width:170px;height:170px;border:1px solid #ffffff14}
+  .target{width:80px;height:80px;border:1px dashed #fff}
+  .ring{border:2px solid #fff;box-shadow:0 0 12px #ffffff55}
+  .beast{font-size:52px;border-radius:0!important;filter:grayscale(1) contrast(1.2) brightness(1.3);z-index:2}
+  .btn{border:0;background:#fff;color:#000;padding:15px 44px;font:600 13px var(--sans);letter-spacing:.26em;text-transform:uppercase}
+  .btn.ghost{background:transparent;color:#fff;border:1px solid #ffffff55;padding:11px 24px;font-size:11px}
+
+  /* dex */
+  .drawer{position:absolute;inset:0;z-index:2500;background:#000;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 24px;overflow:auto;display:none}
+  .drawer.open{display:block}
+  .drawer h1{font:500 22px var(--sans);letter-spacing:.24em;text-transform:uppercase}
+  .drawer .sub{font:400 11px var(--mono);letter-spacing:.16em;color:var(--muted);margin-top:6px;text-transform:uppercase}
+  .x{position:absolute;right:14px;top:calc(14px + env(safe-area-inset-top,0px));background:none;border:1px solid #ffffff55;color:#fff;width:38px;height:38px;font-size:20px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0}
+  .card{border:1px solid var(--line);padding:14px 4px 12px;text-align:center;font:400 10px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+  .card .e{font-size:32px;display:block;margin-bottom:8px;filter:grayscale(1) contrast(1.2) brightness(1.3)}
+  .card b{display:block;color:#fff;font:500 12px var(--sans);letter-spacing:.14em;margin-bottom:4px}
+  .card.no .e{filter:brightness(0) invert(.18)}
+  .card.r3{border-color:#ffffff88}
+  .card.r4{border-color:var(--ice)}
+  .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);padding:14px;margin-top:8px;font:500 12px var(--sans);letter-spacing:.16em;text-transform:uppercase}
+  .sw{width:44px;height:22px;border:1px solid #fff;position:relative}
+  .sw::after{content:'';position:absolute;left:3px;top:3px;width:14px;height:14px;background:#fff;transition:.2s}
+  .sw.on{background:#fff}.sw.on::after{left:25px;background:#000}
+  @media (prefers-reduced-motion:reduce){.me::after,.cr.near i{animation:none}}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="frame"><b class="tl"></b><b class="tr"></b><b class="bl"></b><b class="br"></b><div class="xy" id="xy"></div></div>
+
+<div class="top"><div class="hud">
+  <div class="lvl" id="lvl">LVL 01</div>
+  <div class="bar"><i id="xpbar"></i></div>
+  <div class="orbs"><small>ORBS</small><span id="orbs">10</span></div>
+</div></div>
+
+<div class="hint" id="hint">Simulation: tap the map to move there</div>
+
+<div class="nav">
+  <button id="bLoc">Locate</button>
+  <button id="bDex">Dex</button>
+  <button id="bSim">Sim</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="catch">
+  <div class="info"><b id="cName"></b><div id="cSub"></div></div>
+  <div class="arena" id="arena">
+    <div class="a1"></div><div class="a2"></div>
+    <div class="target" id="target"></div>
+    <div class="ring" id="ring"></div>
+    <div class="beast" id="beast"></div>
+  </div>
+  <div class="info"><div id="cTip">Throw when the ring meets the dashed circle</div></div>
+  <button class="btn" id="throwBtn">Throw</button>
+  <button class="btn ghost" id="runBtn">Abort</button>
+</div>
+
+<div class="drawer" id="dex">
+  <button class="x" id="dexX">×</button>
+  <h1>Dex</h1>
+  <div class="sub" id="dexT"></div>
+  <div class="grid" id="dexG"></div>
+  <div class="row"><span>Simulation mode</span><div class="sw" id="simSw"></div></div>
+  <div class="row"><span>Reset progress</span><button class="btn ghost" id="reset">Reset</button></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ================= Config ================= */
+const LS='wildwalk.v1';
+const CATCH_RANGE=50, STOP_RANGE=50, STOP_COOLDOWN=5*60e3;
+const WINDOW=15*60e3, CELL=0.0018;
+const DEFAULT_POS={lat:45.815,lng:15.982};
+
+const SPECIES=[
+ {n:'Mossling',e:'🌿',r:1},{n:'Puddlepip',e:'🐸',r:1},{n:'Bumbleroot',e:'🐝',r:1},{n:'Pebblet',e:'🪨',r:1},
+ {n:'Gustling',e:'🐦',r:1},{n:'Snailwick',e:'🐌',r:1},
+ {n:'Glimmoth',e:'🦋',r:2},{n:'Frostnib',e:'🐧',r:2},{n:'Sparkit',e:'🐹',r:2},{n:'Duskfox',e:'🦊',r:2},
+ {n:'Cragon',e:'🐲',r:3},{n:'Tidalume',e:'🐙',r:3},{n:'Hootflare',e:'🦉',r:3},
+ {n:'Lunaray',e:'🦄',r:4},{n:'Solwing',e:'🦅',r:4}
+].map((s,i)=>({...s,id:i}));
+const WEIGHT={1:60,2:28,3:10,4:2};
+const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
+
+/* ================= State ================= */
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},sim:false};
+let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
+const save=()=>localStorage.setItem(LS,JSON.stringify(S));
+const $=id=>document.getElementById(id);
+const level=x=>Math.floor(Math.sqrt(x/100))+1;
+const lvStart=l=>(l-1)*(l-1)*100;
+
+/* ================= Helpers ================= */
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dg=r(b.lng-a.lng);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const hash=(a,b,c)=>{let h=2166136261;for(const v of [a,b,c]){h^=v;h=Math.imul(h,16777619);}return h>>>0;};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let tTimer;
+function toast(title,sub='',ms=2300){
+  const t=$('toast');t.innerHTML=`<b>${esc(title)}</b>${sub?`<small>${esc(sub)}</small>`:''}`;
+  t.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ms);
+}
+const vib=p=>navigator.vibrate&&navigator.vibrate(p);
+const pad=n=>String(n).padStart(2,'0');
+
+/* ================= Map ================= */
+const ESRI='https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_';
+const map=L.map('map',{zoomControl:false,attributionControl:true,maxZoom:19}).setView([DEFAULT_POS.lat,DEFAULT_POS.lng],17);
+L.tileLayer(ESRI+'Base/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:19,attribution:'Tiles © Esri'}).addTo(map);
+L.tileLayer(ESRI+'Reference/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:16,maxZoom:19}).addTo(map);
+
+let player={...DEFAULT_POS},gotFix=false;
+const meMarker=L.marker([player.lat,player.lng],{icon:L.divIcon({className:'',html:'<div class="me"></div>',iconSize:[14,14],iconAnchor:[7,7]}),zIndexOffset:1000,interactive:false}).addTo(map);
+const range=L.circle([player.lat,player.lng],{radius:CATCH_RANGE,color:'#fff',weight:1,dashArray:'3 5',fill:false,interactive:false}).addTo(map);
+
+function updateXY(){
+  const f=(v,p,n)=>Math.abs(v).toFixed(4)+'°'+(v>=0?p:n);
+  $('xy').textContent=f(player.lat,'N','S')+'  '+f(player.lng,'E','W')+'  '+(S.sim?'SIM':'GPS');
+}
+function setPlayer(lat,lng,pan){
+  player={lat,lng};
+  meMarker.setLatLng(player);range.setLatLng(player);
+  if(pan)map.panTo(player);
+  updateXY();refresh();maybeFetchStops();
+}
+function onGPS(p){
+  if(S.sim)return;
+  const first=!gotFix;gotFix=true;
+  setPlayer(p.coords.latitude,p.coords.longitude,first||document.body.dataset.follow==='1');
+  if(first)map.setView(player,17);
+}
+function startGPS(){
+  if(!navigator.geolocation){setSim(true);return;}
+  navigator.geolocation.watchPosition(onGPS,()=>{if(!gotFix){toast('No GPS','Switched to simulation',3000);setSim(true);}},{enableHighAccuracy:true,maximumAge:3000,timeout:15000});
+}
+map.on('click',e=>{if(S.sim)setPlayer(e.latlng.lat,e.latlng.lng,false);});
+map.on('dragstart',()=>document.body.dataset.follow='0');
+
+/* ================= Spawns ================= */
+const spawnMarkers={};
+function spawnsAround(center,now=Date.now()){
+  const win=Math.floor(now/WINDOW),out=[];
+  const ci=Math.floor(center.lat/CELL);
+  for(let i=ci-4;i<=ci+4;i++){
+    const latC=(i+.5)*CELL,lngSize=CELL/Math.cos(latC*Math.PI/180);
+    const cj=Math.floor(center.lng/lngSize);
+    for(let j=cj-5;j<=cj+5;j++){
+      const rnd=mulberry(hash(i,j,win)),c=rnd(),n=c<.3?0:c<.8?1:2;
+      for(let k=0;k<n;k++){
+        let w=rnd()*100,r=4;for(const rr of [1,2,3,4]){w-=WEIGHT[rr];if(w<0){r=rr;break;}}
+        const pool=SPECIES.filter(s=>s.r===r),sp=pool[Math.floor(rnd()*pool.length)];
+        const id=`${i}_${j}_${win}_${k}`;
+        out.push({id,sp,lat:i*CELL+rnd()*CELL,lng:j*lngSize+rnd()*lngSize,expires:(win+1)*WINDOW});
+      }
+    }
+  }
+  return out;
+}
+const crIcon=(s,near)=>L.divIcon({className:'',html:`<div class="cr r${s.sp.r}${near?' near':''}"><i></i><span>${s.sp.n.toUpperCase()}</span></div>`,iconSize:[30,30],iconAnchor:[15,15]});
+function refresh(){
+  const now=Date.now(),list=spawnsAround(player,now).filter(s=>!S.gone[s.id]&&dist(player,s)<900);
+  const keep=new Set(list.map(s=>s.id));
+  for(const id in spawnMarkers)if(!keep.has(id)){map.removeLayer(spawnMarkers[id].m);delete spawnMarkers[id];}
+  for(const s of list){
+    const near=dist(player,s)<=CATCH_RANGE;
+    let o=spawnMarkers[s.id];
+    if(!o){
+      const m=L.marker([s.lat,s.lng],{icon:crIcon(s,near)}).addTo(map);
+      m.on('click',()=>tapSpawn(s));spawnMarkers[s.id]=o={m,near};
+    }else if(o.near!==near){o.near=near;o.m.setIcon(crIcon(s,near));}
+  }
+  for(const id in S.gone){if(S.gone[id]<now-WINDOW*2)delete S.gone[id];}
+  refreshStops();
+}
+function tapSpawn(s){
+  const d=dist(player,s);
+  if(d>CATCH_RANGE){toast(s.sp.n,`${Math.round(d)} m away · get within ${CATCH_RANGE} m`);return;}
+  openCatch(s);
+}
+
+/* ================= Catch ================= */
+let cur=null,raf=null,ringR=120;
+const TARGET_R=40;
+function openCatch(s){
+  cur={s,misses:0};
+  $('cName').textContent=s.sp.n;$('cSub').textContent=RNAME[s.sp.r]+' · wild';
+  $('cTip').textContent='Throw when the ring meets the dashed circle';
+  $('beast').textContent=s.sp.e;
+  $('target').style.width=$('target').style.height=TARGET_R*2+'px';
+  $('catch').classList.add('open');startRing();updateHud();
+}
+function startRing(){
+  cancelAnimationFrame(raf);const t0=performance.now();
+  const speed=1500-cur.s.sp.r*180;
+  const step=t=>{const p=((t-t0)%speed)/speed;ringR=125-(125-16)*p;
+    const r=$('ring');r.style.width=r.style.height=ringR*2+'px';raf=requestAnimationFrame(step);};
+  raf=requestAnimationFrame(step);
+}
+function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
+$('runBtn').onclick=closeCatch;
+$('throwBtn').onclick=()=>{
+  if(!cur)return;
+  if(S.orbs<=0){toast('Out of orbs','Visit a stop to restock',2600);closeCatch();return;}
+  S.orbs--;
+  const tol=22-cur.s.sp.r*3,off=Math.abs(ringR-TARGET_R);
+  if(off<=tol){
+    const sp=cur.s.sp,great=off<=tol/3;
+    const cp=Math.round(sp.r*120+Math.random()*180+(great?40:0));
+    const d=S.dex[sp.id]||{count:0,best:0};d.count++;d.best=Math.max(d.best,cp);S.dex[sp.id]=d;
+    const old=level(S.xp),xp=40*sp.r+(d.count===1?100:0)+(great?25:0);S.xp+=xp;
+    S.gone[cur.s.id]=Date.now();save();
+    vib([60,40,120]);
+    toast(`${great?'Excellent · ':''}Caught ${sp.n}`,`CP ${cp} · +${xp} XP${d.count===1?' · new entry':''}${level(S.xp)>old?` · level ${level(S.xp)}`:''}`,3200);
+    closeCatch();
+  }else{
+    cur.misses++;vib(80);
+    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(cur.s.sp.n+' fled');closeCatch();}
+    else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
+  }
+  updateHud();
+};
+
+/* ================= Stops (OpenStreetMap via Overpass) ================= */
+let stops=[],stopMarkers={},lastFetch=null,fetching=false,warned=false;
+async function maybeFetchStops(){
+  if(fetching)return;
+  if(lastFetch&&dist(player,lastFetch)<300)return;
+  const key='ww.stops.'+player.lat.toFixed(3)+'.'+player.lng.toFixed(3);
+  const cached=localStorage.getItem(key);
+  if(cached){stops=JSON.parse(cached);lastFetch={...player};refreshStops();return;}
+  fetching=true;
+  const a=`(around:700,${player.lat},${player.lng})`;
+  const q=`[out:json][timeout:20];(node${a}[tourism~"museum|artwork|viewpoint|attraction|gallery"];node${a}[leisure=park];node${a}[amenity~"cafe|library|fountain|place_of_worship"];node${a}[historic~"monument|memorial"];);out 40;`;
+  try{
+    const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q)});
+    const j=await r.json();
+    stops=j.elements.map(e=>({id:'n'+e.id,lat:e.lat,lng:e.lon,name:e.tags.name||'Landmark'}));
+    try{localStorage.setItem(key,JSON.stringify(stops));}catch(_){}
+    lastFetch={...player};refreshStops();
+  }catch(e){if(!warned){warned=true;toast('Stops offline','Check your connection',2800);}}
+  fetching=false;
+}
+function refreshStops(){
+  const now=Date.now(),ids=new Set(stops.map(s=>s.id));
+  for(const id in stopMarkers)if(!ids.has(id)){map.removeLayer(stopMarkers[id]);delete stopMarkers[id];}
+  for(const s of stops){
+    const cd=(S.stopCd[s.id]||0)>now-STOP_COOLDOWN,near=dist(player,s)<=STOP_RANGE;
+    const icon=L.divIcon({className:'',html:`<div class="stop${cd?' cd':''}${near&&!cd?' near':''}"><i></i></div>`,iconSize:[22,22],iconAnchor:[11,11]});
+    if(!stopMarkers[s.id]){stopMarkers[s.id]=L.marker([s.lat,s.lng],{icon}).addTo(map).on('click',()=>tapStop(s));}
+    else stopMarkers[s.id].setIcon(icon);
+  }
+}
+function tapStop(s){
+  const d=dist(player,s);
+  if(d>STOP_RANGE){toast(s.name,`${Math.round(d)} m away · get within ${STOP_RANGE} m`);return;}
+  const last=S.stopCd[s.id]||0,left=STOP_COOLDOWN-(Date.now()-last);
+  if(left>0){toast(s.name,`Recharging · ${Math.ceil(left/60000)} min`);return;}
+  const n=3+Math.floor(Math.random()*3),xp=25;
+  S.orbs+=n;S.xp+=xp;S.stopCd[s.id]=Date.now();save();vib(60);
+  toast(s.name,`+${n} orbs · +${xp} XP`,2800);
+  updateHud();refreshStops();
+}
+
+/* ================= HUD / Dex ================= */
+function updateHud(){
+  const l=level(S.xp),a=lvStart(l),b=lvStart(l+1);
+  $('lvl').textContent='LVL '+pad(l);$('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';$('orbs').textContent=S.orbs;
+  save();
+}
+function renderDex(){
+  const have=Object.keys(S.dex).length;
+  $('dexT').textContent=`${have} of ${SPECIES.length} logged · level ${level(S.xp)} · ${S.xp} XP`;
+  $('dexG').innerHTML=SPECIES.map(s=>{const d=S.dex[s.id];
+    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'???'}</b>${d?`CP ${d.best} · ×${d.count}`:RNAME[s.r]}</div>`;}).join('');
+  $('simSw').classList.toggle('on',S.sim);
+}
+$('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
+$('dexX').onclick=()=>$('dex').classList.remove('open');
+$('reset').onclick=()=>{if(confirm('Reset all progress?')){localStorage.removeItem(LS);location.reload();}};
+$('bLoc').onclick=()=>{document.body.dataset.follow='1';map.setView(player,Math.max(map.getZoom(),17));};
+
+function setSim(on){
+  S.sim=on;save();
+  $('bSim').classList.toggle('on',on);$('hint').style.display=on?'block':'none';
+  $('simSw').classList.toggle('on',on);updateXY();
+}
+$('bSim').onclick=()=>setSim(!S.sim);
+$('simSw').onclick=()=>setSim(!S.sim);
+
+/* ================= Boot ================= */
+document.body.dataset.follow='1';
+updateHud();setSim(S.sim);updateXY();
+refresh();maybeFetchStops();
+if(!S.sim)startGPS();else{navigator.geolocation&&startGPS();}
+setInterval(refresh,10000);
+</script>
+</body>
+</html>
