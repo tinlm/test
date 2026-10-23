@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Map Themes</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&display=swap" rel="stylesheet">
+<style>
+  /* Layout: sticky control bar, then five full-width map cards stacked, each with a "pick" button. */
+  :root{
+    --bg:#0e1218; --card:#161c25; --line:#273140; --text:#e8eef5; --muted:#8c9bad; --accent:#ffb020;
+    --display:'Bricolage Grotesque',system-ui,sans-serif; --body:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0}
+  html,body{background:var(--bg);color:var(--text);font-family:var(--body)}
+  body{padding:0 16px 90px;max-width:760px;margin:0 auto}
+  header{padding:22px 0 10px}
+  h1{font-family:var(--display);font-weight:800;font-size:30px;letter-spacing:-.02em}
+  header p{color:var(--muted);font-size:14px;line-height:1.5;margin-top:6px;max-width:60ch}
+  .bar{position:sticky;top:0;z-index:1000;background:#0e1218ee;backdrop-filter:blur(8px);display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line);margin-bottom:16px}
+  .bar button{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600}
+  .bar button.on{background:var(--accent);color:#1a1200;border-color:var(--accent)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-bottom:22px}
+  .card.picked{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
+  .head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:14px 16px}
+  .head h2{font-family:var(--display);font-size:22px;letter-spacing:-.01em}
+  .head p{color:var(--muted);font-size:13px;margin-top:3px;line-height:1.4}
+  .num{font-family:var(--display);font-weight:800;font-size:34px;color:var(--line);line-height:1}
+  .map{height:56vh;min-height:320px;width:100%;background:#0b0f14}
+  .foot{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .foot small{color:var(--muted);font-size:12px}
+  .pick{background:var(--accent);color:#1a1200;border:0;border-radius:10px;padding:10px 16px;font-size:15px;font-weight:800}
+  .leaflet-container{font-family:var(--body)}
+  /* markers shared by every theme; each card sets --pin */
+  .me{width:20px;height:20px;border-radius:50%;background:#4da3ff;border:3px solid #fff;box-shadow:0 0 0 7px #4da3ff55}
+  .cr{font-size:30px;line-height:40px;text-align:center;width:40px;height:40px;filter:drop-shadow(0 2px 3px #000b)}
+  .stop{font-size:20px;line-height:32px;text-align:center;width:32px;height:32px;border-radius:50%;background:var(--pin);border:2px solid #fff;box-shadow:0 2px 6px #0009}
+  .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--accent);color:#1a1200;font-weight:800;padding:12px 18px;border-radius:12px;z-index:2000;max-width:90vw;text-align:center;display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Map Themes</h1>
+  <p>Five looks for the game map, same spot, same markers. Scroll to compare, then tap <b>Pick this one</b> under your favorite and tell me its number.</p>
+</header>
+
+<div class="bar">
+  <button id="bLoc">📍 My location</button>
+  <button id="bMove">✋ Move maps: off</button>
+  <button id="bSync" class="on">🔗 Sync: on</button>
+</div>
+
+<div id="list"></div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const FALLBACK = {lat:45.815, lng:15.982};
+let center = {...FALLBACK};
+
+const OSM = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services';
+const attrOSM = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+const attrEsri = 'Tiles © Esri';
+
+const THEMES = [
+  { name:'Neon Night', blurb:'Dark streets with glowing cyan and magenta. Arcade at midnight.',
+    pin:'#d500f9', filter:'invert(1) hue-rotate(185deg) saturate(2.6) brightness(.95) contrast(1.15)',
+    layers:[{url:OSM, o:{maxZoom:19, attribution:attrOSM}}] },
+  { name:'Old Atlas', blurb:'Warm parchment tones. Fantasy quest map.',
+    pin:'#a4491f', filter:'sepia(.95) saturate(1.5) hue-rotate(-12deg) contrast(1.05) brightness(1.03)',
+    layers:[{url:OSM, o:{maxZoom:19, attribution:attrOSM}}] },
+  { name:'Slate', blurb:'Clean dark gray, roads and labels only. Calm and modern.',
+    pin:'#1d6fd8', filter:'none',
+    layers:[
+      {url:ESRI+'/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', o:{maxNativeZoom:16, maxZoom:19, attribution:attrEsri}},
+      {url:ESRI+'/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}', o:{maxNativeZoom:16, maxZoom:19}}
+    ] },
+  { name:'Satellite', blurb:'Real aerial photos. Parks and rivers jump out.',
+    pin:'#ff5d73', filter:'saturate(1.15) contrast(1.05)',
+    layers:[{url:ESRI+'/World_Imagery/MapServer/tile/{z}/{y}/{x}', o:{maxNativeZoom:19, maxZoom:19, attribution:attrEsri+', Maxar, Earthstar Geographics'}}] },
+  { name:'Trail', blurb:'Topographic contours and hiking paths. Explorer feel.',
+    pin:'#2e7d32', filter:'none',
+    layers:[{url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', o:{subdomains:'abc', maxNativeZoom:17, maxZoom:19, attribution:attrOSM+', © <a href="https://opentopomap.org">OpenTopoMap</a>'}}] }
+];
+
+const list = document.getElementById('list');
+const maps = [], groups = [];
+let syncOn = true, moveOn = false, syncing = false;
+let picked = null;
+try { picked = parseInt(localStorage.getItem('maptheme.pick')); if (isNaN(picked)) picked = null; } catch(e){}
+
+THEMES.forEach((t, i) => {
+  const card = document.createElement('section');
+  card.className = 'card' + (picked === i ? ' picked' : '');
+  card.style.setProperty('--pin', t.pin);
+  card.innerHTML = `
+    <div class="head"><div><h2>${t.name}</h2><p>${t.blurb}</p></div><div class="num">${i+1}</div></div>
+    <div class="map" id="map${i}"></div>
+    <div class="foot"><small>Theme ${i+1} of ${THEMES.length}</small><button class="pick" data-i="${i}">Pick this one</button></div>`;
+  list.appendChild(card);
+
+  const m = L.map('map'+i, {zoomControl:true, dragging:false, scrollWheelZoom:false, doubleClickZoom:true, maxZoom:19}).setView([center.lat, center.lng], 17);
+  t.layers.forEach(l => L.tileLayer(l.url, l.o).addTo(m));
+  m.getPane('tilePane').style.filter = t.filter;
+  maps.push(m); groups.push(L.layerGroup().addTo(m));
+
+  m.on('moveend', () => {
+    if (syncing || !syncOn) return;
+    syncing = true;
+    maps.forEach(o => { if (o !== m) o.setView(m.getCenter(), m.getZoom(), {animate:false}); });
+    setTimeout(() => syncing = false, 80);
+  });
+});
+
+function icon(html, size){ return L.divIcon({className:'', html, iconSize:[size,size], iconAnchor:[size/2,size/2]}); }
+function placeMarkers(){
+  const c = center;
+  const items = [
+    {dy:0,       dx:0,       h:'<div class="me"></div>', s:20},
+    {dy:.00055,  dx:.0007,   h:'<div class="cr">🦋</div>', s:40},
+    {dy:-.0007,  dx:-.0009,  h:'<div class="cr">🦊</div>', s:40},
+    {dy:.0011,   dx:-.0008,  h:'<div class="cr">🦉</div>', s:40},
+    {dy:-.0004,  dx:.0012,   h:'<div class="stop">☕</div>', s:32},
+    {dy:.0003,   dx:-.0014,  h:'<div class="stop">🏛️</div>', s:32},
+    {dy:-.0012,  dx:.0003,   h:'<div class="stop">🌳</div>', s:32}
+  ];
+  groups.forEach(g => {
+    g.clearLayers();
+    items.forEach(it => L.marker([c.lat+it.dy, c.lng+it.dx], {icon:icon(it.h, it.s)}).addTo(g));
+  });
+}
+placeMarkers();
+
+function toast(msg){
+  const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.style.display = 'none', 2200);
+}
+
+function locate(quiet){
+  if (!navigator.geolocation){ if(!quiet) toast('Location not supported'); return; }
+  navigator.geolocation.getCurrentPosition(p => {
+    center = {lat:p.coords.latitude, lng:p.coords.longitude};
+    syncing = true;
+    maps.forEach(m => m.setView([center.lat, center.lng], 17, {animate:false}));
+    setTimeout(() => syncing = false, 80);
+    placeMarkers();
+    if(!quiet) toast('Centered on you');
+  }, () => { if(!quiet) toast('Allow location in Chrome site settings'); }, {enableHighAccuracy:true, timeout:10000});
+}
+document.getElementById('bLoc').onclick = () => locate(false);
+locate(true);
+
+document.getElementById('bMove').onclick = e => {
+  moveOn = !moveOn;
+  maps.forEach(m => moveOn ? m.dragging.enable() : m.dragging.disable());
+  e.target.textContent = '✋ Move maps: ' + (moveOn ? 'on' : 'off');
+  e.target.classList.toggle('on', moveOn);
+};
+document.getElementById('bSync').onclick = e => {
+  syncOn = !syncOn;
+  e.target.textContent = '🔗 Sync: ' + (syncOn ? 'on' : 'off');
+  e.target.classList.toggle('on', syncOn);
+};
+
+list.addEventListener('click', e => {
+  const b = e.target.closest('.pick'); if (!b) return;
+  const i = +b.dataset.i;
+  document.querySelectorAll('.card').forEach((c, j) => c.classList.toggle('picked', j === i));
+  try { localStorage.setItem('maptheme.pick', i); } catch(_){}
+  toast('Picked: ' + (i+1) + ' · ' + THEMES[i].name + ' (tell me this number)');
+});
+</script>
+</body>
+</html>
