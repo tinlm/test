@@ -227,9 +227,7 @@ function themeStyle(s){
         if(has(id,'casing','outline','bridge_casing')){hide();break;}
         if(has(id,'boundary','admin')){l.paint['line-color']='#262d36';break;}
         if(has(id,'water'))l.paint['line-color']='#0c1218';
-        else if(has(id,'motorway','trunk','primary'))l.paint['line-color']='#f1f4f7';
-        else if(has(id,'secondary','tertiary'))l.paint['line-color']='#8e98a4';
-        else if(has(id,'minor','service','street','track','residential','road'))l.paint['line-color']='#4a525c';
+        else if(has(id,'motorway','trunk','primary','secondary','tertiary','minor','service','street','track','residential','road'))l.paint['line-color']='#6f7984';
         else if(has(id,'path','pedestrian','footway','steps','cycle'))l.paint['line-color']='#2d343c';
         else if(has(id,'rail','transit'))l.paint['line-color']='#2a3038';
         else l.paint['line-color']='#3a414a';
