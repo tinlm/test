@@ -106,21 +106,16 @@
   .sw{width:42px;height:22px;border:1px solid var(--hi);position:relative}
   .sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;background:#666;transition:.2s}
   .sw.on{border-color:#fff}.sw.on::after{left:22px;background:#fff}
-  /* ===== Orbit cinematic ===== */
+  /* ===== Orbit cinematic: pure black space ===== */
   :root{--bar:max(76px,11vh)}
-  #stars{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:0;pointer-events:none}
-  #glow{position:fixed;left:50%;top:50%;width:max(130vmin,520px);height:max(130vmin,520px);transform:translate(-50%,-50%);z-index:0;opacity:0;pointer-events:none;background:radial-gradient(circle,rgba(90,160,255,.30) 0,rgba(60,120,255,.12) 34%,transparent 60%);transition:opacity 1.6s}
-  body.orbit #glow{opacity:1}
+  #earth{position:fixed;inset:0;width:100%;height:100%;z-index:2;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;touch-action:none}
+  body.earth-on #earth{opacity:1;pointer-events:auto}
   .hud,.nav,.corner,.hint{transition:opacity .7s}
   body.orbit .hud,body.orbit .nav,body.orbit .corner,body.orbit .hint{opacity:0;pointer-events:none}
   .maplibregl-marker{transition:opacity .6s}
-  body.orbit .maplibregl-marker:not(.keep){opacity:0!important;pointer-events:none}
+  body.orbit .maplibregl-marker{opacity:0!important;pointer-events:none}
   body.orbit .maplibregl-ctrl-bottom-right{bottom:calc(var(--bar) + 8px)}
   #orbit{position:fixed;inset:0;z-index:1500;pointer-events:none;overflow:hidden}
-  .vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.62) 100%);opacity:0;transition:opacity 1.6s}
-  body.orbit .vig{opacity:1}
-  .sun{position:absolute;right:-22vmin;top:-16vmin;width:76vmin;height:76vmin;background:radial-gradient(circle,rgba(255,244,220,.5) 0,rgba(255,220,160,.15) 28%,transparent 62%);opacity:0;mix-blend-mode:screen;transition:opacity 2.5s 3s}
-  body.orbit .sun{opacity:1}
   .lbar{position:absolute;left:0;right:0;background:#000;display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:transform 1.3s cubic-bezier(.2,.8,.2,1);font:400 10px var(--mono);letter-spacing:.22em;color:#aab4bf;text-transform:uppercase}
   .lt{top:0;height:calc(var(--bar) * .7 + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);transform:translateY(-101%)}
   .lb{bottom:0;height:calc(var(--bar) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);transform:translateY(101%)}
@@ -128,28 +123,24 @@
   .tel{letter-spacing:.14em;white-space:nowrap}
   .tel span{margin-right:16px}
   .tel b{color:#fff;font-weight:500}
+  .credit{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(6px + env(safe-area-inset-bottom,0px));font:400 8px var(--mono);letter-spacing:.1em;color:#5d6670;text-transform:none}
   .ret{pointer-events:auto;background:transparent;color:#fff;border:1px solid #ffffff88;padding:10px 14px;font:500 11px var(--sans);letter-spacing:.22em;text-transform:uppercase}
   .cap{position:absolute;left:0;right:0;bottom:calc(var(--bar) + 30px + env(safe-area-inset-bottom,0px));text-align:center;font:500 13px var(--sans);letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#fff;opacity:0}
   body.spun .cap{animation:cap 6s ease 1}
   @keyframes cap{0%{opacity:0;transform:translateY(8px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
-  .flash{position:absolute;inset:0;background:#fff;opacity:0}
-  body.spun .flash{animation:fl 1.4s ease-out 1}
-  @keyframes fl{0%{opacity:.3}100%{opacity:0}}
 </style>
 </head>
 <body>
-<canvas id="stars"></canvas>
-<div id="glow"></div>
+<canvas id="earth"></canvas>
 <div id="map"></div>
 
 <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
 
 <div id="orbit">
-  <div class="vig"></div><div class="sun"></div>
   <div class="lbar lt"><span>Wildwalk</span><span>Orbital view</span></div>
   <div class="cap">Low Earth orbit</div>
   <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
-  <div class="flash"></div>
+  <div class="credit">Imagery © Esri · Night lights NASA GIBS / VIIRS</div>
 </div>
 
 <div class="hud"><div class="panel">
@@ -264,6 +255,7 @@ function themeStyle(s){
       case 'fill-extrusion': l.paint['fill-extrusion-color']='#0d1015';delete l.paint['fill-extrusion-pattern'];break;
       case 'line':
         delete l.paint['line-pattern'];
+        if(l['source-layer']==='transportation')l.minzoom=13;
         if(has(id,'casing','outline','bridge_casing')){hide();break;}
         if(has(id,'boundary','admin')){l.paint['line-color']='#262d36';break;}
         if(l['source-layer']==='transportation')l.paint['line-color']=['match',['get','class'],['path','pedestrian','steps','footway','cycleway'],'#2d343c',['rail','transit'],'#2a3038','#6f7984'];
@@ -576,72 +568,308 @@ $('bSim').onclick=()=>setSim(!SIM);
 $('simSw').onclick=()=>setSim(!SIM);
 
 /* ================= Orbit cinematic: map to space ================= */
-let orbit=false,returning=false,spinRAF=null,dragging=false,zTop=1;
-const starsEl=$('stars');
-function drawStars(){
-  const dpr=Math.min(devicePixelRatio||1,2),w=innerWidth,h=innerHeight;
-  starsEl.width=w*dpr;starsEl.height=h*dpr;
-  const g=starsEl.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
-  g.fillStyle='#000';g.fillRect(0,0,w,h);
-  const band=g.createLinearGradient(0,h*.1,w,h*.9);
-  band.addColorStop(0,'rgba(0,0,0,0)');band.addColorStop(.5,'rgba(120,140,190,.10)');band.addColorStop(1,'rgba(0,0,0,0)');
-  g.fillStyle=band;g.fillRect(0,0,w,h);
-  const rnd=mulberry(7);
-  for(let i=0;i<520;i++){
-    const x=rnd()*w,y=rnd()*h,r=Math.pow(rnd(),4)*1.5+.25,a=.35+rnd()*.65,t=rnd();
-    g.fillStyle=t<.15?`rgba(170,200,255,${a})`:t<.25?`rgba(255,225,190,${a})`:`rgba(255,255,255,${a})`;
-    g.beginPath();g.arc(x,y,r,0,7);g.fill();
-  }
-}
-drawStars();addEventListener('resize',drawStars);
+const ZH=3.6, FOV=30*Math.PI/180, SUN=(()=>{const v=[-.62,.30,.72],l=Math.hypot(...v);return v.map(x=>x/l);})();
+let orbit=false,returning=false,fallbackGlobe=false,spinRAF=null,dragging=false,orbitToken=0,hiddenLabels=[];
 
+/* --- labels: hidden for the whole flight --- */
+function hideLabels(){
+  hiddenLabels=[];
+  ((map.getStyle()||{}).layers||[]).forEach(l=>{
+    if(l.type==='symbol'&&map.getLayoutProperty(l.id,'visibility')!=='none'){map.setLayoutProperty(l.id,'visibility','none');hiddenLabels.push(l.id);}
+  });
+}
+function showLabels(){hiddenLabels.forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});hiddenLabels=[];}
+
+/* --- satellite crossfade on the flat map --- */
 function ensureSat(){
   if(map.getSource('sat'))return;
   map.addSource('sat',{type:'raster',tileSize:256,maxzoom:8,attribution:'Imagery © Esri',
     tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']});
-  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-saturation':.2,'raster-contrast':.1}});
+  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0}});
 }
 function updateSat(){
   const z=map.getZoom();
-  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/3)):0);
-  starsEl.style.opacity=orbit?Math.max(0,Math.min(1,(7-z)/3)):0;
+  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/2.5)):0);
 }
-function updateTelem(){
-  const z=map.getZoom(),f=Math.max(0,Math.min(1,(17-z)/(17-zTop)));
+function setTelem(f){
+  f=Math.max(0,Math.min(1,f));
   const alt=0.5*Math.pow(816,f),vel=7.66*Math.min(1,f*1.15);
   $('alt').textContent=alt<1?Math.round(alt*1000)+' M':Math.round(alt).toLocaleString('en-US')+' KM';
   $('vel').textContent=vel.toFixed(2)+' KM/S';
 }
 map.on('zoom',()=>{
   updateSat();
-  if(orbit){updateTelem();if(returning&&map.getZoom()>9)document.body.classList.remove('orbit');}
+  if(!orbit)return;
+  const z=map.getZoom();
+  if(!E.active)setTelem(.55*Math.max(0,Math.min(1,(17-z)/(17-ZH))));
+  if(returning&&z>9)document.body.classList.remove('orbit');
+  if(returning&&z>10&&hiddenLabels.length)showLabels();
 });
-const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
 
+/* ================= Earth renderer (WebGL2 shader): black space, atmosphere, clouds, night lights ================= */
+const E={cv:$('earth'),gl:null,prog:null,u:{},loading:null,active:false,state:'idle',hasNight:0,
+         latA:0,lonA:0,lat0:0,lon0:0,D:5,Dh:2,Dend:11,lnD:0,f:0,ts:0,last:0,time:0,drag:false,lnD0:0,f0:0};
+const VS='#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}';
+const FS=`#version 300 es
+precision highp float;
+uniform vec2 uRes;uniform float uD,uFov,uT,uRoll,uHasNight;
+uniform vec3 uX,uY,uZ,uSun;
+uniform sampler2D uDay,uNight;
+out vec4 oc;
+const float PI=3.14159265359;
+float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+  return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
+vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*uRes)/(.5*uRes.y);
+  float cr=cos(uRoll),sr=sin(uRoll);uv=mat2(cr,-sr,sr,cr)*uv;
+  float tf=tan(uFov*.5);
+  vec3 rd=normalize(vec3(uv*tf,-1.));
+  vec3 ro=vec3(0.,0.,uD);
+  float b=dot(ro,rd),disc=b*b-(dot(ro,ro)-1.);
+  vec3 pc=ro-rd*b;float dmin=length(pc);
+  float px=uD*2.*tf/uRes.y;
+  float cover=clamp((1.-dmin)/px+.5,0.,1.);
+  vec3 p=ro+rd*(-b-sqrt(max(disc,0.)));
+  vec3 n=normalize(p);
+  vec3 nl=uX*n.x+uY*n.y+uZ*n.z;
+  vec3 sunL=uX*uSun.x+uY*uSun.y+uZ*uSun.z;
+  float lat=asin(clamp(nl.y,-1.,1.)),lon=atan(nl.x,nl.z);
+  float la=clamp(lat,-1.4844,1.4844);
+  vec2 uvA=vec2(lon/(2.*PI)+.5,clamp(.5-log(tan(PI*.25+la*.5))/(2.*PI),0.,1.));
+  vec2 uvB=vec2(fract(uvA.x+.5)-.5,uvA.y);
+  vec2 dxA=dFdx(uvA),dyA=dFdy(uvA),dxB=dFdx(uvB),dyB=dFdy(uvB);
+  bool useB=dot(dxA,dxA)+dot(dyA,dyA)>dot(dxB,dxB)+dot(dyB,dyB);
+  vec2 gx=useB?dxB:dxA,gy=useB?dyB:dyA;
+  vec3 dayT=textureGrad(uDay,uvA,gx,gy).rgb;
+  vec3 nightT=textureGrad(uNight,uvA,gx,gy).rgb;
+  float lum=dot(dayT,vec3(.3,.59,.11));
+  float ocean=smoothstep(.02,.09,dayT.b-max(dayT.r,dayT.g))*(1.-smoothstep(.22,.5,lum));
+  vec3 alb=pow(dayT,vec3(1.45));
+  alb=mix(alb,alb*vec3(.6,.9,1.35),ocean*.7);
+  alb=mix(alb,vec3(.78,.82,.9),smoothstep(1.25,1.45,abs(lat)));
+  float ndl=dot(n,uSun);
+  float day=smoothstep(-.12,.2,ndl);
+  float diff=max(ndl,0.);
+  vec3 drift=vec3(uT*.010,0.,uT*.005);
+  float cl=smoothstep(.52,.80,fbm(nl*3.6+drift));
+  float cs=smoothstep(.52,.80,fbm((nl-sunL*.035)*3.6+drift));
+  vec3 land=alb*(1.-.5*cs*day);
+  vec3 col=land*(diff*vec3(1.,.96,.9)*2.2+vec3(.004,.007,.016));
+  col+=ocean*vec3(.010,.05,.15)*(.25+diff)*day;
+  vec3 vv=normalize(ro-p);
+  vec3 hv=normalize(uSun+vv);
+  float spec=pow(max(dot(n,hv),0.),140.)*ocean*(1.-cl)*step(0.,ndl);
+  col+=spec*vec3(1.,.88,.7)*2.6;
+  vec3 cloud=vec3(.95,.97,1.)*(diff*2.1+.012);
+  col=mix(col,cloud,cl*.93);
+  if(uHasNight>.5){
+    float lights=(1.-day)*(1.-cl*.9);
+    col+=pow(nightT,vec3(1.35))*vec3(1.,.72,.42)*2.6*lights;
+  }
+  float fr=1.-max(dot(n,vv),0.);
+  col+=vec3(.20,.48,1.)*fr*fr*fr*(.15+1.6*smoothstep(-.25,.7,ndl));
+  col+=vec3(1.,.42,.16)*exp(-ndl*ndl*70.)*(.05+.95*fr)*.30;
+  float h=max(dmin-1.,0.);
+  float sl=smoothstep(-.35,.65,dot(pc/max(dmin,1e-4),uSun));
+  float g=exp(-h*60.)*1.15+exp(-h*16.)*.30+exp(-h*260.)*.9;
+  vec3 gc=mix(vec3(.18,.42,1.),vec3(.55,.85,1.),exp(-h*120.));
+  vec3 outer=gc*g*(.06+.94*sl);
+  vec3 res=mix(outer,col,cover);
+  res=aces(res*.9);
+  res=pow(res,vec3(1./2.2));
+  res+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.014;
+  oc=vec4(res,1.);
+}`;
+
+function earthInit(){
+  if(E.gl)return true;
+  try{
+    const gl=E.cv.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+    if(!gl)return false;
+    const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;};
+    const pr=gl.createProgram();
+    gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));
+    ['uRes','uD','uFov','uT','uRoll','uHasNight','uX','uY','uZ','uSun','uDay','uNight'].forEach(k=>E.u[k]=gl.getUniformLocation(pr,k));
+    E.gl=gl;E.prog=pr;
+    return true;
+  }catch(e){console.warn('earth init failed',e);return false;}
+}
+function makeTex(canvasOrData,unit,isCanvas){
+  const gl=E.gl,t=gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
+  if(isCanvas){
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    const ex=gl.getExtension('EXT_texture_filter_anisotropic');
+    if(ex)gl.texParameterf(gl.TEXTURE_2D,ex.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(ex.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  }else{
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  }
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  return t;
+}
+function loadMosaic(urlFn,z){
+  return new Promise(res=>{
+    const n=1<<z,c=document.createElement('canvas');c.width=c.height=n*256;
+    const g=c.getContext('2d');let left=n*n,ok=0;
+    const done=()=>{if(--left===0)res(ok>=n*n*.8?c:null);};
+    for(let x=0;x<n;x++)for(let y=0;y<n;y++){
+      const im=new Image();im.crossOrigin='anonymous';
+      im.onload=()=>{g.drawImage(im,x*256,y*256);ok++;done();};
+      im.onerror=done;
+      im.src=urlFn(z,x,y);
+    }
+  });
+}
+function earthPrepare(){
+  if(E.loading)return E.loading;
+  E.loading=(async()=>{
+    if(!earthInit())return false;
+    const day=await loadMosaic((z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,3);
+    if(!day)return false;
+    try{
+      E.texDay=makeTex(day,0,true);
+      E.texNight=makeTex(new Uint8Array([0,0,0,255]),1,false);
+    }catch(e){console.warn('texture upload failed',e);return false;}
+    // night lights: optional, never blocks the flight
+    loadMosaic((z,x,y)=>`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/${z}/${y}/${x}.png`,2).then(c=>{
+      if(!c)return;
+      try{E.texNight=makeTex(c,1,true);E.hasNight=1;}catch(e){}
+    });
+    return true;
+  })();
+  return E.loading;
+}
+function earthSize(){
+  const dpr=Math.min(devicePixelRatio||1,2);
+  E.cv.width=Math.round(innerWidth*dpr);E.cv.height=Math.round(innerHeight*dpr);
+  if(E.gl)E.gl.viewport(0,0,E.cv.width,E.cv.height);
+}
+addEventListener('resize',()=>{if(E.active)earthSize();});
+function camBasis(lat,lon){
+  const cl=Math.cos(lat),sl=Math.sin(lat),co=Math.cos(lon),so=Math.sin(lon);
+  return {z:[cl*so,sl,cl*co],y:[-sl*so,cl,-sl*co],x:[co,0,-so]};
+}
+const hAtZoom=(z,lat)=>(6.2907*Math.cos(lat)/(512*Math.pow(2,z)))*innerHeight/(2*Math.tan(FOV/2));
+function earthDraw(){
+  const gl=E.gl,b=camBasis(E.latA+Math.sin(E.time*.31)*.012,E.lonA);
+  gl.useProgram(E.prog);
+  gl.uniform2f(E.u.uRes,E.cv.width,E.cv.height);
+  gl.uniform1f(E.u.uD,E.D);gl.uniform1f(E.u.uFov,FOV);gl.uniform1f(E.u.uT,E.time);
+  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012);gl.uniform1f(E.u.uHasNight,E.hasNight);
+  gl.uniform3fv(E.u.uX,b.x);gl.uniform3fv(E.u.uY,b.y);gl.uniform3fv(E.u.uZ,b.z);gl.uniform3fv(E.u.uSun,SUN);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,E.texDay);gl.uniform1i(E.u.uDay,0);
+  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,E.texNight);gl.uniform1i(E.u.uNight,1);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function earthFrame(){
+  if(!E.active)return;
+  const now=performance.now()/1000,dt=Math.min(.05,now-E.last);E.last=now;E.time+=dt;
+  let lnD,f;
+  if(E.state==='in'){
+    const p=Math.min(1,(now-E.ts)/4.6),e=1-Math.pow(1-p,3);
+    lnD=Math.log(E.Dh)+(Math.log(E.Dend)-Math.log(E.Dh))*e;f=.55+.45*e;
+    E.latA+=(0.36-E.latA)*(1-Math.exp(-dt*.9));
+    if(!E.drag)E.lonA-=0.09*dt;
+    if(p>=1)E.state='spin';
+  }else if(E.state==='spin'){
+    lnD=Math.log(E.Dend);f=1;
+    if(!E.drag){E.lonA-=0.09*dt;E.latA+=(0.36-E.latA)*(1-Math.exp(-dt*.9));}
+  }else{
+    const p=Math.min(1,(now-E.ts)/3.8),e=p*p*p;
+    lnD=E.lnD0+(Math.log(E.Dh)-E.lnD0)*e;f=E.f0+(.55-E.f0)*e;
+    E.latA+=(E.lat0-E.latA)*(1-Math.exp(-dt*(1.5+5*e)));
+    E.lonA+=wrapA(E.lon0-E.lonA)*(1-Math.exp(-dt*(1.5+6*e)));
+    if(p>=1){earthStop();return;}
+  }
+  E.lnD=lnD;E.f=f;E.D=Math.exp(lnD);setTelem(f);
+  earthDraw();
+  requestAnimationFrame(earthFrame);
+}
+function earthStart(){
+  earthSize();
+  E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;
+  E.latA=E.lat0;E.lonA=E.lon0;
+  const H=innerHeight,W=innerWidth,tf=Math.tan(FOV/2),rad=.40*Math.min(W,H);
+  E.Dh=1+hAtZoom(ZH,E.lat0);
+  E.Dend=Math.sqrt(1+Math.pow(H/(2*rad*tf),2));
+  E.D=E.Dh;E.state='in';E.ts=E.last=performance.now()/1000;E.time=0;E.drag=false;E.active=true;
+  document.body.classList.add('earth-on','spun');
+  earthFrame();
+  setTimeout(()=>{if(E.active)$('map').style.visibility='hidden';},1100);
+}
+function earthStop(){
+  E.active=false;E.state='idle';
+  map.jumpTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0});
+  $('map').style.visibility='visible';
+  document.body.classList.remove('earth-on');
+  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:4600,curve:1.4,essential:true,easing:t=>1-Math.pow(1-t,1.8)});
+  map.on('moveend',function h(){if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}});
+}
+/* drag to spin the planet */
+(()=>{
+  let lx=0,ly=0,tm=null;
+  const radpx=()=>(innerHeight/2)/(Math.tan(FOV/2)*Math.sqrt(Math.max(E.D*E.D-1,.01)));
+  E.cv.addEventListener('pointerdown',e=>{if(!E.active||E.state==='out')return;E.drag=true;clearTimeout(tm);lx=e.clientX;ly=e.clientY;E.cv.setPointerCapture(e.pointerId);});
+  E.cv.addEventListener('pointermove',e=>{
+    if(!E.drag)return;const r=radpx();
+    E.lonA-=(e.clientX-lx)/r;E.latA=Math.max(-1.3,Math.min(1.3,E.latA+(e.clientY-ly)/r));lx=e.clientX;ly=e.clientY;
+  });
+  const up=()=>{if(!E.drag)return;tm=setTimeout(()=>{E.drag=false;},1600);};
+  E.cv.addEventListener('pointerup',up);E.cv.addEventListener('pointercancel',up);
+})();
+
+/* ================= Sequence control ================= */
 function startOrbit(){
   if(orbit)return;
   if(!styleReady){toast('Map is still loading');return;}
-  orbit=true;returning=false;
+  orbit=true;returning=false;fallbackGlobe=false;
+  const token=++orbitToken;
   document.body.dataset.follow='0';
   document.body.classList.add('orbit');
-  ensureSat();
-  map.setProjection({type:'globe'});
-  try{map.setSky({'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0]});}catch(e){}
-  zTop=Math.max(-1,Math.log2(Math.min(innerWidth,innerHeight)*.40*2*Math.PI/512));
-  updateSat();updateTelem();
-  map.flyTo({center:[player.lng,18],zoom:zTop,pitch:0,bearing:0,duration:7500,curve:1.6,essential:true,easing:ease});
+  hideLabels();ensureSat();
+  const pre=earthPrepare();           // starts downloading the planet texture right away
+  setTelem(0);updateSat();
+  map.flyTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0,duration:4800,curve:1.4,essential:true,easing:t=>Math.pow(t,1.8)});
   map.on('moveend',function h(){
-    if(orbit&&!returning&&Math.abs(map.getZoom()-zTop)<.05){map.off('moveend',h);beginSpin();}
+    if(!orbit||returning||token!==orbitToken){map.off('moveend',h);return;}
+    if(Math.abs(map.getZoom()-ZH)<.05){map.off('moveend',h);handoff(token,pre);}
   });
   vib([30,60,30]);
 }
-function beginSpin(){
+async function handoff(token,pre){
+  const ok=await Promise.race([pre,new Promise(r=>setTimeout(()=>r(false),8000))]);
+  if(token!==orbitToken||!orbit||returning)return;
+  if(ok)earthStart();else globeFallback();
+}
+/* fallback if WebGL2 or the planet texture is unavailable: MapLibre's own globe */
+function globeFallback(){
+  fallbackGlobe=true;
+  map.setProjection({type:'globe'});
+  try{map.setSky({'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0]});}catch(e){}
+  const zTop=Math.max(-1,Math.log2(Math.min(innerWidth,innerHeight)*.40*2*Math.PI/512));
+  map.flyTo({center:[player.lng,18],zoom:zTop,pitch:0,bearing:0,duration:3500,essential:true});
   document.body.classList.add('spun');
+  map.on('moveend',function h(){
+    if(orbit&&!returning&&Math.abs(map.getZoom()-zTop)<.05){map.off('moveend',h);beginSpin();}
+  });
+}
+function beginSpin(){
   let last=performance.now();
   const tick=t=>{
     if(!orbit||returning)return;
     const dt=Math.min(.05,(t-last)/1000);last=t;
-    if(!dragging){const c=map.getCenter();map.jumpTo({center:[c.lng+dt*7,c.lat]});}
+    if(!dragging){const c=map.getCenter();map.jumpTo({center:[c.lng+dt*5,c.lat]});}
     spinRAF=requestAnimationFrame(tick);
   };
   spinRAF=requestAnimationFrame(tick);
@@ -651,19 +879,23 @@ map.on('dragend',()=>{if(orbit)setTimeout(()=>{dragging=false;},1800);});
 
 function endOrbit(){
   if(!orbit||returning)return;
-  returning=true;cancelAnimationFrame(spinRAF);dragging=false;
-  map.stop();
-  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:7000,curve:1.6,essential:true,easing:ease});
-  map.on('moveend',function h(){
-    if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}
-  });
+  returning=true;
+  if(E.active){            // fly the camera back down to the map
+    E.state='out';E.ts=performance.now()/1000;E.lnD0=E.lnD;E.f0=E.f;
+    E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;E.drag=false;
+    return;
+  }
+  cancelAnimationFrame(spinRAF);dragging=false;map.stop();
+  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:6000,curve:1.4,essential:true,easing:t=>1-Math.pow(1-t,1.8)});
+  map.on('moveend',function h(){if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}});
 }
 function finishOrbit(){
   orbit=false;returning=false;
-  document.body.classList.remove('orbit','spun');
+  document.body.classList.remove('orbit','spun','earth-on');
+  $('map').style.visibility='visible';
   document.body.dataset.follow='1';
-  map.setProjection({type:'mercator'});
-  updateSat();
+  if(fallbackGlobe){map.setProjection({type:'mercator'});fallbackGlobe=false;}
+  showLabels();updateSat();
 }
 $('bOrbit').onclick=startOrbit;
 $('ret').onclick=endOrbit;
