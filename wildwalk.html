@@ -253,7 +253,7 @@ async function loadMapStyle(){
 }
 
 const map=new maplibregl.Map({
-  container:'map',center:[DEFAULT_POS.lng,DEFAULT_POS.lat],zoom:17,minZoom:5,maxZoom:19.5,
+  container:'map',center:[DEFAULT_POS.lng,DEFAULT_POS.lat],zoom:17,minZoom:0,maxZoom:19.5,
   style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#050608'}}]},
   attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false
 });
