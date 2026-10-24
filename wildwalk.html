@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <title>Wildwalk</title>
-<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.23.0/dist/maplibre-gl.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -14,7 +14,7 @@
   *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
   html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
   button{font-family:var(--sans)}
-  #map{position:absolute;inset:0;background:#050608}
+  #map{position:absolute;inset:0;z-index:1;background:transparent}
   .maplibregl-ctrl-bottom-right{bottom:70px}
   .maplibregl-ctrl-attrib.maplibregl-compact{background:#000a}
   .maplibregl-ctrl-attrib-button{filter:invert(1)}
@@ -106,12 +106,51 @@
   .sw{width:42px;height:22px;border:1px solid var(--hi);position:relative}
   .sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;background:#666;transition:.2s}
   .sw.on{border-color:#fff}.sw.on::after{left:22px;background:#fff}
+  /* ===== Orbit cinematic ===== */
+  :root{--bar:max(76px,11vh)}
+  #stars{position:fixed;inset:0;width:100%;height:100%;z-index:0;opacity:0;pointer-events:none}
+  #glow{position:fixed;left:50%;top:50%;width:max(130vmin,520px);height:max(130vmin,520px);transform:translate(-50%,-50%);z-index:0;opacity:0;pointer-events:none;background:radial-gradient(circle,rgba(90,160,255,.30) 0,rgba(60,120,255,.12) 34%,transparent 60%);transition:opacity 1.6s}
+  body.orbit #glow{opacity:1}
+  .hud,.nav,.corner,.hint{transition:opacity .7s}
+  body.orbit .hud,body.orbit .nav,body.orbit .corner,body.orbit .hint{opacity:0;pointer-events:none}
+  .maplibregl-marker{transition:opacity .6s}
+  body.orbit .maplibregl-marker:not(.keep){opacity:0!important;pointer-events:none}
+  body.orbit .maplibregl-ctrl-bottom-right{bottom:calc(var(--bar) + 8px)}
+  #orbit{position:fixed;inset:0;z-index:1500;pointer-events:none;overflow:hidden}
+  .vig{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,.62) 100%);opacity:0;transition:opacity 1.6s}
+  body.orbit .vig{opacity:1}
+  .sun{position:absolute;right:-22vmin;top:-16vmin;width:76vmin;height:76vmin;background:radial-gradient(circle,rgba(255,244,220,.5) 0,rgba(255,220,160,.15) 28%,transparent 62%);opacity:0;mix-blend-mode:screen;transition:opacity 2.5s 3s}
+  body.orbit .sun{opacity:1}
+  .lbar{position:absolute;left:0;right:0;background:#000;display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:transform 1.3s cubic-bezier(.2,.8,.2,1);font:400 10px var(--mono);letter-spacing:.22em;color:#aab4bf;text-transform:uppercase}
+  .lt{top:0;height:calc(var(--bar) * .7 + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);transform:translateY(-101%)}
+  .lb{bottom:0;height:calc(var(--bar) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);transform:translateY(101%)}
+  body.orbit .lbar{transform:none}
+  .tel{letter-spacing:.14em;white-space:nowrap}
+  .tel span{margin-right:16px}
+  .tel b{color:#fff;font-weight:500}
+  .ret{pointer-events:auto;background:transparent;color:#fff;border:1px solid #ffffff88;padding:10px 14px;font:500 11px var(--sans);letter-spacing:.22em;text-transform:uppercase}
+  .cap{position:absolute;left:0;right:0;bottom:calc(var(--bar) + 30px + env(safe-area-inset-bottom,0px));text-align:center;font:500 13px var(--sans);letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#fff;opacity:0}
+  body.spun .cap{animation:cap 6s ease 1}
+  @keyframes cap{0%{opacity:0;transform:translateY(8px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
+  .flash{position:absolute;inset:0;background:#fff;opacity:0}
+  body.spun .flash{animation:fl 1.4s ease-out 1}
+  @keyframes fl{0%{opacity:.3}100%{opacity:0}}
 </style>
 </head>
 <body>
+<canvas id="stars"></canvas>
+<div id="glow"></div>
 <div id="map"></div>
 
 <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+
+<div id="orbit">
+  <div class="vig"></div><div class="sun"></div>
+  <div class="lbar lt"><span>Wildwalk</span><span>Orbital view</span></div>
+  <div class="cap">Low Earth orbit</div>
+  <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
+  <div class="flash"></div>
+</div>
 
 <div class="hud"><div class="panel">
   <div class="r1">
@@ -128,6 +167,7 @@
 <div class="nav">
   <button id="bLoc">Locate</button>
   <button id="bDex">Dex</button>
+  <button id="bOrbit">Orbit</button>
   <button id="bSim">Sim</button>
 </div>
 
@@ -163,7 +203,7 @@
   <button class="btn ghost" id="gSim">Play in sim mode</button>
 </div>
 
-<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.23.0/dist/maplibre-gl.js"></script>
 <script>
 /* ================= Config ================= */
 const LS='wildwalk.v1';
@@ -272,7 +312,8 @@ function addRange(){
   map.addLayer({id:'range',type:'line',source:'range',paint:{'line-color':'#ffffff','line-width':1,'line-dasharray':[2,3],'line-opacity':.85}});
 }
 map.on('style.load',addRange);
-loadMapStyle().then(s=>map.setStyle(s,{diff:false}));
+let styleReady=false;
+loadMapStyle().then(s=>{map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
 
 function mkMarker(html,lng,lat,onClick,z){
   const el=document.createElement('div');el.innerHTML=html;
@@ -282,6 +323,7 @@ function mkMarker(html,lng,lat,onClick,z){
   return {mk,el};
 }
 const me=mkMarker('<div class="me"></div>',player.lng,player.lat,null,10);
+me.el.classList.add('keep');
 
 function setReadout(){$('mode').textContent=SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING');}
 function setPlayer(lat,lng,pan){
@@ -532,6 +574,99 @@ function setSim(on){
 }
 $('bSim').onclick=()=>setSim(!SIM);
 $('simSw').onclick=()=>setSim(!SIM);
+
+/* ================= Orbit cinematic: map to space ================= */
+let orbit=false,returning=false,spinRAF=null,dragging=false,zTop=1;
+const starsEl=$('stars');
+function drawStars(){
+  const dpr=Math.min(devicePixelRatio||1,2),w=innerWidth,h=innerHeight;
+  starsEl.width=w*dpr;starsEl.height=h*dpr;
+  const g=starsEl.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  g.fillStyle='#000';g.fillRect(0,0,w,h);
+  const band=g.createLinearGradient(0,h*.1,w,h*.9);
+  band.addColorStop(0,'rgba(0,0,0,0)');band.addColorStop(.5,'rgba(120,140,190,.10)');band.addColorStop(1,'rgba(0,0,0,0)');
+  g.fillStyle=band;g.fillRect(0,0,w,h);
+  const rnd=mulberry(7);
+  for(let i=0;i<520;i++){
+    const x=rnd()*w,y=rnd()*h,r=Math.pow(rnd(),4)*1.5+.25,a=.35+rnd()*.65,t=rnd();
+    g.fillStyle=t<.15?`rgba(170,200,255,${a})`:t<.25?`rgba(255,225,190,${a})`:`rgba(255,255,255,${a})`;
+    g.beginPath();g.arc(x,y,r,0,7);g.fill();
+  }
+}
+drawStars();addEventListener('resize',drawStars);
+
+function ensureSat(){
+  if(map.getSource('sat'))return;
+  map.addSource('sat',{type:'raster',tileSize:256,maxzoom:8,attribution:'Imagery © Esri',
+    tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']});
+  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-saturation':.2,'raster-contrast':.1}});
+}
+function updateSat(){
+  const z=map.getZoom();
+  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/3)):0);
+  starsEl.style.opacity=orbit?Math.max(0,Math.min(1,(7-z)/3)):0;
+}
+function updateTelem(){
+  const z=map.getZoom(),f=Math.max(0,Math.min(1,(17-z)/(17-zTop)));
+  const alt=0.5*Math.pow(816,f),vel=7.66*Math.min(1,f*1.15);
+  $('alt').textContent=alt<1?Math.round(alt*1000)+' M':Math.round(alt).toLocaleString('en-US')+' KM';
+  $('vel').textContent=vel.toFixed(2)+' KM/S';
+}
+map.on('zoom',()=>{
+  updateSat();
+  if(orbit){updateTelem();if(returning&&map.getZoom()>9)document.body.classList.remove('orbit');}
+});
+const ease=t=>t<.5?4*t*t*t:1-Math.pow(-2*t+2,3)/2;
+
+function startOrbit(){
+  if(orbit)return;
+  if(!styleReady){toast('Map is still loading');return;}
+  orbit=true;returning=false;
+  document.body.dataset.follow='0';
+  document.body.classList.add('orbit');
+  ensureSat();
+  map.setProjection({type:'globe'});
+  try{map.setSky({'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0]});}catch(e){}
+  zTop=Math.max(-1,Math.log2(Math.min(innerWidth,innerHeight)*.40*2*Math.PI/512));
+  updateSat();updateTelem();
+  map.flyTo({center:[player.lng,18],zoom:zTop,pitch:0,bearing:0,duration:7500,curve:1.6,essential:true,easing:ease});
+  map.on('moveend',function h(){
+    if(orbit&&!returning&&Math.abs(map.getZoom()-zTop)<.05){map.off('moveend',h);beginSpin();}
+  });
+  vib([30,60,30]);
+}
+function beginSpin(){
+  document.body.classList.add('spun');
+  let last=performance.now();
+  const tick=t=>{
+    if(!orbit||returning)return;
+    const dt=Math.min(.05,(t-last)/1000);last=t;
+    if(!dragging){const c=map.getCenter();map.jumpTo({center:[c.lng+dt*7,c.lat]});}
+    spinRAF=requestAnimationFrame(tick);
+  };
+  spinRAF=requestAnimationFrame(tick);
+}
+map.on('dragstart',()=>{if(orbit)dragging=true;});
+map.on('dragend',()=>{if(orbit)setTimeout(()=>{dragging=false;},1800);});
+
+function endOrbit(){
+  if(!orbit||returning)return;
+  returning=true;cancelAnimationFrame(spinRAF);dragging=false;
+  map.stop();
+  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:7000,curve:1.6,essential:true,easing:ease});
+  map.on('moveend',function h(){
+    if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}
+  });
+}
+function finishOrbit(){
+  orbit=false;returning=false;
+  document.body.classList.remove('orbit','spun');
+  document.body.dataset.follow='1';
+  map.setProjection({type:'mercator'});
+  updateSat();
+}
+$('bOrbit').onclick=startOrbit;
+$('ret').onclick=endOrbit;
 
 /* ================= Boot ================= */
 document.body.dataset.follow='1';
