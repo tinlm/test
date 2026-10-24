@@ -144,7 +144,7 @@
   <div class="lbar lt"><span>Wildwalk</span><span>Orbital view</span></div>
   <div class="cap">Low Earth orbit</div>
   <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
-  <div class="credit">Imagery © Esri · Night lights NASA GIBS / VIIRS</div>
+  <div class="credit">Imagery © Esri</div>
 </div>
 
 <div class="hud"><div class="panel">
@@ -649,7 +649,7 @@ function ensureSat(){
   if(map.getSource('sat'))return;
   map.addSource('sat',{type:'raster',tileSize:256,maxzoom:8,attribution:'Imagery © Esri',
     tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']});
-  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0}});
+  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-brightness-max':.8,'raster-contrast':.12}});
 }
 function updateSat(){
   const z=map.getZoom();
@@ -670,22 +670,26 @@ map.on('zoom',()=>{
   if(returning&&z>10&&hiddenLabels.length)showLabels();
 });
 
-/* ================= Earth renderer (WebGL2 shader): black space, atmosphere, clouds, night lights ================= */
+/* ================= Earth renderer (WebGL2 shader): black space, thin atmosphere, glossy water, graded continents ================= */
 const E={cv:$('earth'),gl:null,prog:null,u:{},loading:null,active:false,state:'idle',hasNight:0,
          latA:0,lonA:0,lat0:0,lon0:0,D:5,Dh:2,Dend:11,lnD:0,f:0,ts:0,last:0,time:0,drag:false,lnD0:0,f0:0};
 const VS='#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}';
 const FS=`#version 300 es
 precision highp float;
-uniform vec2 uRes;uniform float uD,uFov,uT,uRoll,uHasNight;
-uniform vec3 uX,uY,uZ,uSun;
-uniform sampler2D uDay,uNight;
+uniform vec2 uRes;uniform float uD,uFov,uT,uRoll;
+uniform vec3 uX,uY,uZ;
+uniform sampler2D uDay;
 out vec4 oc;
 const float PI=3.14159265359;
 float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
   return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
              mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
-float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<5;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
+vec3 ngrad(vec3 p){float e=.08;
+  return vec3(noise(p+vec3(e,0,0))-noise(p-vec3(e,0,0)),noise(p+vec3(0,e,0))-noise(p-vec3(0,e,0)),noise(p+vec3(0,0,e))-noise(p-vec3(0,0,e)))/(2.*e);}
+float lumOf(vec3 c){return dot(c,vec3(.3,.59,.11));}
+float waterOf(vec3 c){return smoothstep(.01,.06,c.b-c.r)*smoothstep(-.04,.0,c.b-c.g)*(1.-smoothstep(.28,.5,lumOf(c)));}
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){
   vec2 uv=(gl_FragCoord.xy-.5*uRes)/(.5*uRes.y);
@@ -700,7 +704,6 @@ void main(){
   vec3 p=ro+rd*(-b-sqrt(max(disc,0.)));
   vec3 n=normalize(p);
   vec3 nl=uX*n.x+uY*n.y+uZ*n.z;
-  vec3 sunL=uX*uSun.x+uY*uSun.y+uZ*uSun.z;
   float lat=asin(clamp(nl.y,-1.,1.)),lon=atan(nl.x,nl.z);
   float la=clamp(lat,-1.4844,1.4844);
   vec2 uvA=vec2(lon/(2.*PI)+.5,clamp(.5-log(tan(PI*.25+la*.5))/(2.*PI),0.,1.));
@@ -709,43 +712,66 @@ void main(){
   bool useB=dot(dxA,dxA)+dot(dyA,dyA)>dot(dxB,dxB)+dot(dyB,dyB);
   vec2 gx=useB?dxB:dxA,gy=useB?dyB:dyA;
   vec3 dayT=textureGrad(uDay,uvA,gx,gy).rgb;
-  vec3 nightT=textureGrad(uNight,uvA,gx,gy).rgb;
-  float lum=dot(dayT,vec3(.3,.59,.11));
-  float ocean=smoothstep(.02,.09,dayT.b-max(dayT.r,dayT.g))*(1.-smoothstep(.22,.5,lum));
-  vec3 alb=pow(dayT,vec3(1.45));
-  alb=mix(alb,alb*vec3(.6,.9,1.35),ocean*.7);
-  alb=mix(alb,vec3(.78,.82,.9),smoothstep(1.25,1.45,abs(lat)));
-  float ndl=dot(n,uSun);
-  float day=smoothstep(-.12,.2,ndl);
-  float diff=max(ndl,0.);
-  vec3 drift=vec3(uT*.010,0.,uT*.005);
-  float cl=smoothstep(.52,.80,fbm(nl*3.6+drift));
-  float cs=smoothstep(.52,.80,fbm((nl-sunL*.035)*3.6+drift));
-  vec3 land=alb*(1.-.5*cs*day);
-  vec3 col=land*(diff*vec3(1.,.96,.9)*2.2+vec3(.004,.007,.016));
-  col+=ocean*vec3(.010,.05,.15)*(.25+diff)*day;
+  vec3 blurT=textureLod(uDay,uvA,3.5).rgb;
+
+  /* a slow travelling light gives the water its sheen; there is no day or night */
+  vec3 L=normalize(vec3(-.55+.40*sin(uT*.23),.50+.18*cos(uT*.19),.70));
   vec3 vv=normalize(ro-p);
-  vec3 hv=normalize(uSun+vv);
-  float spec=pow(max(dot(n,hv),0.),140.)*ocean*(1.-cl)*step(0.,ndl);
-  col+=spec*vec3(1.,.88,.7)*2.6;
-  vec3 cloud=vec3(.95,.97,1.)*(diff*2.1+.012);
-  col=mix(col,cloud,cl*.93);
-  if(uHasNight>.5){
-    float lights=(1.-day)*(1.-cl*.9);
-    col+=pow(nightT,vec3(1.35))*vec3(1.,.72,.42)*2.6*lights;
-  }
-  float fr=1.-max(dot(n,vv),0.);
-  col+=vec3(.20,.48,1.)*fr*fr*fr*(.15+1.6*smoothstep(-.25,.7,ndl));
-  col+=vec3(1.,.42,.16)*exp(-ndl*ndl*70.)*(.05+.95*fr)*.30;
+  float ndv=max(dot(n,vv),0.);
+  float diff=.46+.54*smoothstep(-.35,1.,dot(n,L));
+
+  float w=waterOf(dayT),wb=waterOf(blurT);
+  float coast=w*(1.-wb);
+  float lum=lumOf(dayT);
+
+  /* land: deep, graded colour with relief shading taken from the imagery brightness */
+  vec3 land=pow(dayT,vec3(1.22));
+  land=mix(vec3(lumOf(land)),land,1.18);
+  float h0=lumOf(textureLod(uDay,uvA,1.).rgb);
+  float h1=lumOf(textureLod(uDay,uvA+vec2(L.x,-L.y)*.0012,1.).rgb);
+  land*=1.+(h0-h1)*7.;
+  land*=1.+(fbm(nl*70.)-.5)*.10;
+  land*=.80;
+  land=mix(land,vec3(.50,.58,.68),smoothstep(1.25,1.42,abs(lat)));
+  land*=diff;
+
+  /* water: depth colour, coastal shallows, animated micro-waves, fresnel sky and sun glints */
+  float t=smoothstep(.05,.30,lum);
+  vec3 wc=mix(vec3(.003,.025,.085),vec3(.008,.10,.24),smoothstep(0.,.6,t));
+  wc=mix(wc,vec3(.03,.34,.42),clamp(t*.55+coast*1.1,0.,1.));
+  vec3 g1=ngrad(nl*24.+vec3(uT*.10,uT*.06,uT*.04));
+  vec3 g2=ngrad(nl*61.+vec3(-uT*.13,uT*.09,uT*.05));
+  vec3 gg=g1+.5*g2;
+  vec3 gc=vec3(dot(gg,uX),dot(gg,uY),dot(gg,uZ));
+  gc-=n*dot(gc,n);
+  vec3 wn=normalize(n-.055*gc);
+  float nv=max(dot(wn,vv),0.);
+  float fr=.02+.98*pow(1.-nv,5.);
+  vec3 sky=mix(vec3(.07,.16,.38),vec3(.45,.70,1.),pow(1.-nv,1.5));
+  vec3 H=normalize(L+vv);
+  float nh=max(dot(wn,H),0.);
+  float sp=pow(nh,420.)*3.0+pow(nh,60.)*.10;
+  vec3 wcol=wc*(.55+.45*diff)+sky*fr*.9+sp*vec3(1.,.97,.92);
+
+  vec3 col=mix(land,wcol,w);
+
+  /* limb darkening, blue haze and a thin bright rim */
+  col*=mix(.60,1.,smoothstep(0.,.5,ndv));
+  col=mix(col,vec3(.12,.34,.80),pow(1.-ndv,3.)*.45);
+  col+=vec3(.30,.62,1.)*pow(1.-ndv,6.)*1.1+vec3(.75,.92,1.)*pow(1.-ndv,16.)*1.6;
+
+  /* tight atmosphere glow, then pure black */
   float h=max(dmin-1.,0.);
-  float sl=smoothstep(-.35,.65,dot(pc/max(dmin,1e-4),uSun));
-  float g=exp(-h*60.)*1.15+exp(-h*16.)*.30+exp(-h*260.)*.9;
-  vec3 gc=mix(vec3(.18,.42,1.),vec3(.55,.85,1.),exp(-h*120.));
-  vec3 outer=gc*g*(.06+.94*sl);
+  float g=(exp(-h*70.)*.95+exp(-h*28.)*.22+exp(-h*300.))*(1.-smoothstep(.10,.26,h));
+  g*=.65+.35*clamp(dot(pc/max(dmin,1e-4),L)*.5+.5,0.,1.);
+  vec3 outer=mix(vec3(.16,.40,1.),vec3(.6,.88,1.),exp(-h*140.))*g;
+
   vec3 res=mix(outer,col,cover);
-  res=aces(res*.9);
+  res=aces(res*.95);
   res=pow(res,vec3(1./2.2));
-  res+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.014;
+  float lm=max(res.r,max(res.g,res.b));
+  res+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.012*smoothstep(.03,.2,lm);
+  res=max(res-.004,0.);
   oc=vec4(res,1.);
 }`;
 
@@ -758,7 +784,7 @@ function earthInit(){
     const pr=gl.createProgram();
     gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
     if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));
-    ['uRes','uD','uFov','uT','uRoll','uHasNight','uX','uY','uZ','uSun','uDay','uNight'].forEach(k=>E.u[k]=gl.getUniformLocation(pr,k));
+    ['uRes','uD','uFov','uT','uRoll','uX','uY','uZ','uDay'].forEach(k=>E.u[k]=gl.getUniformLocation(pr,k));
     E.gl=gl;E.prog=pr;
     return true;
   }catch(e){console.warn('earth init failed',e);return false;}
@@ -802,13 +828,7 @@ function earthPrepare(){
     if(!day)return false;
     try{
       E.texDay=makeTex(day,0,true);
-      E.texNight=makeTex(new Uint8Array([0,0,0,255]),1,false);
     }catch(e){console.warn('texture upload failed',e);return false;}
-    // night lights: optional, never blocks the flight
-    loadMosaic((z,x,y)=>`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_Black_Marble/default/2016-01-01/GoogleMapsCompatible_Level8/${z}/${y}/${x}.png`,2).then(c=>{
-      if(!c)return;
-      try{E.texNight=makeTex(c,1,true);E.hasNight=1;}catch(e){}
-    });
     return true;
   })();
   return E.loading;
@@ -829,10 +849,9 @@ function earthDraw(){
   gl.useProgram(E.prog);
   gl.uniform2f(E.u.uRes,E.cv.width,E.cv.height);
   gl.uniform1f(E.u.uD,E.D);gl.uniform1f(E.u.uFov,FOV);gl.uniform1f(E.u.uT,E.time);
-  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012);gl.uniform1f(E.u.uHasNight,E.hasNight);
-  gl.uniform3fv(E.u.uX,b.x);gl.uniform3fv(E.u.uY,b.y);gl.uniform3fv(E.u.uZ,b.z);gl.uniform3fv(E.u.uSun,SUN);
+  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012);
+  gl.uniform3fv(E.u.uX,b.x);gl.uniform3fv(E.u.uY,b.y);gl.uniform3fv(E.u.uZ,b.z);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,E.texDay);gl.uniform1i(E.u.uDay,0);
-  gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,E.texNight);gl.uniform1i(E.u.uNight,1);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
 const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
