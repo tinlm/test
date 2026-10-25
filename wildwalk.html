@@ -735,23 +735,8 @@ void main(){
   land=mix(land,vec3(.50,.58,.68),smoothstep(1.25,1.42,abs(lat)));
   land*=diff;
 
-  /* water: depth colour, coastal shallows, animated micro-waves, fresnel sky and sun glints */
-  float t=smoothstep(.05,.30,lum);
-  vec3 wc=mix(vec3(.003,.025,.085),vec3(.008,.10,.24),smoothstep(0.,.6,t));
-  wc=mix(wc,vec3(.03,.34,.42),clamp(t*.55+coast*1.1,0.,1.));
-  vec3 g1=ngrad(nl*24.+vec3(uT*.10,uT*.06,uT*.04));
-  vec3 g2=ngrad(nl*61.+vec3(-uT*.13,uT*.09,uT*.05));
-  vec3 gg=g1+.5*g2;
-  vec3 gc=vec3(dot(gg,uX),dot(gg,uY),dot(gg,uZ));
-  gc-=n*dot(gc,n);
-  vec3 wn=normalize(n-.055*gc);
-  float nv=max(dot(wn,vv),0.);
-  float fr=.02+.98*pow(1.-nv,5.);
-  vec3 sky=mix(vec3(.07,.16,.38),vec3(.45,.70,1.),pow(1.-nv,1.5));
-  vec3 H=normalize(L+vv);
-  float nh=max(dot(wn,H),0.);
-  float sp=pow(nh,420.)*3.0+pow(nh,60.)*.10;
-  vec3 wcol=wc*(.55+.45*diff)+sky*fr*.9+sp*vec3(1.,.97,.92);
+  /* water: one flat colour everywhere, no sun reflection */
+  vec3 wcol=vec3(.010,.085,.205);
 
   vec3 col=mix(land,wcol,w);
 
