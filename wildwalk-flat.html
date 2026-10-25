@@ -1,0 +1,989 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Wildwalk</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.23.0/dist/maplibre-gl.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Mission Control: black ground, white hairlines, wide-tracked caps, mono readouts. Ice blue marks only the epic tier. */
+  :root{--bg:#000;--panel:#07090c;--line:#2a3038;--hi:#ffffff66;--text:#f2f4f6;--muted:#7d8791;--ice:#8fd3ff;
+        --sans:'Barlow',system-ui,sans-serif;--mono:'IBM Plex Mono',ui-monospace,monospace}
+  *{box-sizing:border-box;margin:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);overflow:hidden}
+  button{font-family:var(--sans)}
+  #map{position:absolute;inset:0;z-index:1;background:transparent}
+  .maplibregl-ctrl-bottom-right{bottom:70px}
+  .maplibregl-ctrl-attrib.maplibregl-compact{background:#000a}
+  .maplibregl-ctrl-attrib-button{filter:invert(1)}
+  .maplibregl-ctrl-attrib a{color:#b5bec7}
+  .maplibregl-ctrl-attrib-inner{color:#8a949e}
+
+  .hud{position:absolute;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 10px 0;pointer-events:none}
+  .panel{pointer-events:auto;background:#000d;border:1px solid var(--hi);padding:9px 12px 8px;backdrop-filter:blur(6px)}
+  .r1{display:flex;align-items:center;gap:12px}
+  .lvl,.orbs{font:500 12px var(--mono);letter-spacing:.18em;white-space:nowrap}
+  .bar{flex:1;height:2px;background:#ffffff26}
+  .bar i{display:block;height:100%;width:0;background:#fff;transition:width .4s}
+  .mh{display:flex;justify-content:space-between;margin-top:9px;padding-top:8px;border-top:1px solid var(--line);font:400 9px var(--mono);letter-spacing:.22em;color:var(--muted);text-transform:uppercase}
+  .mq{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:5px;cursor:pointer}
+  .mq .t{font:500 13px var(--sans);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+  .mq .d{font:500 11px var(--mono);letter-spacing:.1em;white-space:nowrap;color:#fff}
+
+  .corner{position:absolute;z-index:900;width:16px;height:16px;border:1px solid #ffffffaa;pointer-events:none}
+  .c1{top:calc(max(10px,env(safe-area-inset-top)) + 112px);left:10px;border-right:0;border-bottom:0}
+  .c2{top:calc(max(10px,env(safe-area-inset-top)) + 112px);right:10px;border-left:0;border-bottom:0}
+  .c3{bottom:76px;left:10px;border-right:0;border-top:0}
+  .c4{bottom:76px;right:10px;border-left:0;border-top:0}
+
+  .nav{position:absolute;left:0;right:0;bottom:0;z-index:1000;display:flex;gap:8px;padding:10px 10px max(12px,env(safe-area-inset-bottom));pointer-events:none}
+  .nav button{pointer-events:auto;flex:1;background:#000d;color:var(--text);border:1px solid var(--hi);padding:14px 4px;font:500 12px var(--sans);letter-spacing:.22em;text-transform:uppercase;backdrop-filter:blur(6px)}
+  .nav button.on{background:#fff;color:#000;border-color:#fff}
+  .hint{position:absolute;left:10px;right:10px;bottom:70px;z-index:1000;text-align:center;font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;background:#000c;border:1px solid var(--line);padding:6px 10px;pointer-events:none;display:none}
+
+  /* markers */
+  .me{position:relative;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px #000;pointer-events:none}
+  .me::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:50%;animation:ping 2.4s ease-out infinite}
+  @keyframes ping{from{transform:scale(.6);opacity:.9}to{transform:scale(1.5);opacity:0}}
+  .cr{position:relative;width:40px;height:40px;cursor:pointer}
+  .cr i{position:absolute;inset:7px;border:1px solid #fff;background:#000;transform:rotate(45deg)}
+  .cr.r3 i{box-shadow:0 0 0 3px #000,0 0 0 4px #fff}
+  .cr.r4 i{border-color:var(--ice);box-shadow:0 0 0 3px #000,0 0 0 4px var(--ice)}
+  .cr b{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:400;filter:brightness(0) invert(1)}
+  .cr span{display:none;position:absolute;top:42px;left:50%;transform:translateX(-50%);white-space:nowrap;font:500 9px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;text-shadow:0 0 4px #000,0 0 4px #000}
+  .cr.near{animation:hover 1.6s ease-in-out infinite}
+  .cr.near i{background:#fff}
+  .cr.near b{filter:brightness(0)}
+  .cr.near span{display:block}
+  @keyframes hover{50%{transform:translateY(-4px)}}
+  .stop{position:relative;width:24px;height:24px;border:1px solid #fff;background:#000;display:grid;place-items:center;font-size:12px;cursor:pointer}
+  .stop b{font-weight:400;filter:brightness(0) invert(1)}
+  .stop.near{background:#fff}.stop.near b{filter:brightness(0)}
+  .stop.cd{border-color:#666;opacity:.45}
+  .stop.target::after{content:"";position:absolute;inset:-8px;border:1px solid #fff;animation:ping 2s ease-out infinite}
+  @media (prefers-reduced-motion:reduce){.me::after,.stop.target::after,.cr.near,.beast{animation:none!important}}
+
+  .toast{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 138px);transform:translate(-50%,-6px);z-index:5000;background:#fff;color:#000;padding:12px 18px;text-align:center;opacity:0;pointer-events:none;transition:all .25s;max-width:88vw;font:600 13px var(--sans);letter-spacing:.14em;text-transform:uppercase}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+  .toast small{display:block;font:400 10px var(--mono);letter-spacing:.1em;margin-top:4px;text-transform:none}
+
+  .modal,.gate{position:absolute;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+  .modal{z-index:2000}.gate{z-index:4000;text-align:center}
+  .modal.open,.gate.open{display:flex}
+  .gate .eyebrow{font:400 10px var(--mono);letter-spacing:.3em;color:var(--muted);text-transform:uppercase}
+  .gate h2{font:500 24px var(--sans);letter-spacing:.2em;text-transform:uppercase}
+  .gate p{max-width:34ch;color:var(--muted);font-size:14px;line-height:1.55}
+  .info{text-align:center}
+  .info b{display:block;font:500 22px var(--sans);letter-spacing:.22em;text-transform:uppercase}
+  .info div{color:var(--muted);font:400 11px var(--mono);letter-spacing:.16em;margin-top:6px;text-transform:uppercase}
+  .arena{position:relative;width:260px;height:260px}
+  .arena>*{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%}
+  .outer{width:250px;height:250px;border:1px solid #ffffff22}
+  .target{width:80px;height:80px;border:1px dashed #fff}
+  .ring{border:1.5px solid #fff}
+  .beast{font-size:54px;z-index:2;filter:brightness(0) invert(1);animation:float 2.4s ease-in-out infinite}
+  @keyframes float{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,calc(-50% - 6px))}}
+  .btn{border:0;padding:15px 44px;font:600 13px var(--sans);letter-spacing:.24em;text-transform:uppercase;background:#fff;color:#000}
+  .btn{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-select:none}
+  .btn:disabled{opacity:.5}
+  .gate .gs{font:400 11px var(--mono);letter-spacing:.06em;color:#c7cfd8;min-height:1.4em}
+  .stop.supply{border-style:dashed}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--hi);padding:11px 24px;font-size:11px}
+
+  .drawer{position:absolute;inset:0;z-index:2500;background:#000;padding:max(16px,env(safe-area-inset-top)) 16px 24px;overflow:auto;display:none}
+  .drawer.open{display:block}
+  .drawer h1{font:500 22px var(--sans);letter-spacing:.24em;text-transform:uppercase;margin-bottom:2px}
+  .drawer .sub{font:400 10px var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase}
+  .x{position:absolute;right:16px;top:max(14px,env(safe-area-inset-top));background:none;border:1px solid var(--hi);color:var(--text);width:36px;height:36px;font-size:18px}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0 12px}
+  .card{border:1px solid var(--line);background:var(--panel);padding:14px 4px 10px;text-align:center;font:400 9px var(--mono);letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+  .card .e{display:block;font-size:34px;line-height:1.2;margin-bottom:8px;filter:brightness(0) invert(1)}
+  .card b{display:block;font:500 12px var(--sans);letter-spacing:.18em;color:var(--text);margin-bottom:3px}
+  .card .pips{display:block;letter-spacing:.3em;margin-bottom:4px}
+  .card.no .e{filter:brightness(0) invert(1) opacity(.14)}
+  .card.no b{color:#4a525b}
+  .card.r4:not(.no){border-color:var(--ice)}
+  .card.r4:not(.no) .pips{color:var(--ice)}
+  .row{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--line);padding:13px;margin-top:8px;font:500 11px var(--sans);letter-spacing:.18em;text-transform:uppercase}
+  .sw{width:42px;height:22px;border:1px solid var(--hi);position:relative}
+  .sw::after{content:'';position:absolute;left:2px;top:2px;width:16px;height:16px;background:#666;transition:.2s}
+  .sw.on{border-color:#fff}.sw.on::after{left:22px;background:#fff}
+  /* ===== Orbit cinematic: pure black space ===== */
+  :root{--bar:max(76px,11vh)}
+  #earth{position:fixed;inset:0;width:100%;height:100%;z-index:2;background:#000;opacity:0;pointer-events:none;transition:opacity .9s;touch-action:none}
+  body.earth-on #earth{opacity:1;pointer-events:auto}
+  .hud,.nav,.corner,.hint{transition:opacity .7s}
+  body.orbit .hud,body.orbit .nav,body.orbit .corner,body.orbit .hint{opacity:0;pointer-events:none}
+  .maplibregl-marker{transition:opacity .6s}
+  body.orbit .maplibregl-marker{opacity:0!important;pointer-events:none}
+  body.orbit .maplibregl-ctrl-bottom-right{bottom:calc(var(--bar) + 8px)}
+  #orbit{position:fixed;inset:0;z-index:1500;pointer-events:none;overflow:hidden}
+  .lbar{position:absolute;left:0;right:0;background:#000;display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:transform 1.3s cubic-bezier(.2,.8,.2,1);font:400 10px var(--mono);letter-spacing:.22em;color:#aab4bf;text-transform:uppercase}
+  .lt{top:0;height:calc(var(--bar) * .7 + env(safe-area-inset-top,0px));padding-top:env(safe-area-inset-top,0px);transform:translateY(-101%)}
+  .lb{bottom:0;height:calc(var(--bar) + env(safe-area-inset-bottom,0px));padding-bottom:env(safe-area-inset-bottom,0px);transform:translateY(101%)}
+  body.orbit .lbar{transform:none}
+  .tel{letter-spacing:.14em;white-space:nowrap}
+  .tel span{margin-right:16px}
+  .tel b{color:#fff;font-weight:500}
+  .credit{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(6px + env(safe-area-inset-bottom,0px));font:400 8px var(--mono);letter-spacing:.1em;color:#5d6670;text-transform:none}
+  .ret{pointer-events:auto;background:transparent;color:#fff;border:1px solid #ffffff88;padding:10px 14px;font:500 11px var(--sans);letter-spacing:.22em;text-transform:uppercase}
+  .cap{position:absolute;left:0;right:0;bottom:calc(var(--bar) + 30px + env(safe-area-inset-bottom,0px));text-align:center;font:500 13px var(--sans);letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#fff;opacity:0}
+  body.spun .cap{animation:cap 6s ease 1}
+  @keyframes cap{0%{opacity:0;transform:translateY(8px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
+</style>
+</head>
+<body>
+<canvas id="earth"></canvas>
+<div id="map"></div>
+
+<div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
+
+<div id="orbit">
+  <div class="lbar lt"><span id="rend">Wildwalk</span><span>Orbital view</span></div>
+  <div class="cap">Low Earth orbit</div>
+  <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
+  <div class="credit">Imagery © Esri</div>
+</div>
+
+<div class="hud"><div class="panel">
+  <div class="r1">
+    <div class="lvl" id="lvl">LV 01</div>
+    <div class="bar"><i id="xpbar"></i></div>
+    <div class="orbs" id="orbs">ORB 10</div>
+  </div>
+  <div class="mh"><span>Missions</span><span id="mode">LOCATING</span></div>
+  <div class="mq" id="mq"><span class="t" id="mt">Scanning for missions</span><span class="d" id="md"></span></div>
+</div></div>
+
+<div class="hint" id="hint">Sim mode · tap the map to move</div>
+
+<div class="nav">
+  <button id="bLoc">Locate</button>
+  <button id="bDex">Dex</button>
+  <button id="bOrbit">Orbit</button>
+  <button id="bSim">Sim</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal" id="catch">
+  <div class="info"><b id="cName"></b><div id="cSub"></div></div>
+  <div class="arena" id="arena">
+    <div class="outer"></div>
+    <div class="target" id="target"></div>
+    <div class="ring" id="ring"></div>
+    <div class="beast" id="beast"></div>
+  </div>
+  <div class="info"><div id="cTip">Throw when the ring meets the dashed circle</div></div>
+  <button class="btn" id="throwBtn">Throw orb</button>
+  <button class="btn ghost" id="runBtn">Release</button>
+</div>
+
+<div class="drawer" id="dex">
+  <button class="x" id="dexX">×</button>
+  <h1 id="dexT">Dex</h1>
+  <div class="sub">Specimen log</div>
+  <div class="grid" id="dexG"></div>
+  <div class="row"><span>Simulation mode</span><div class="sw" id="simSw"></div></div>
+  <div class="row"><span>Build</span><span id="build" style="font:400 11px var(--mono);letter-spacing:.1em;color:#8c97a3"></span></div>
+  <div class="row"><span>Reset progress</span><button class="btn ghost" id="reset">Reset</button></div>
+</div>
+
+<div class="gate" id="gate">
+  <div class="eyebrow">Wildwalk</div>
+  <h2 id="gT">Allow location</h2>
+  <p id="gP"></p>
+  <p id="gS" class="gs"></p>
+  <button class="btn" id="gTry">Enable location</button>
+  <button class="btn ghost" id="gSim">Play in sim mode</button>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@5.23.0/dist/maplibre-gl.js"></script>
+<script>
+/* ================= Config ================= */
+const LS='wildwalk.v1';
+const BUILD='b15';
+const CATCH_RANGE=50, STOP_RANGE=50, STOP_COOLDOWN=3*60e3;
+const WINDOW=15*60e3, CELL=0.0018;
+const DEFAULT_POS={lat:45.815,lng:15.982};
+
+const SPECIES=[
+ {n:'Mossling',e:'🌿',r:1},{n:'Puddlepip',e:'🐸',r:1},{n:'Bumbleroot',e:'🐝',r:1},{n:'Pebblet',e:'🪨',r:1},
+ {n:'Gustling',e:'🐦',r:1},{n:'Snailwick',e:'🐌',r:1},
+ {n:'Glimmoth',e:'🦋',r:2},{n:'Frostnib',e:'🐧',r:2},{n:'Sparkit',e:'🐹',r:2},{n:'Duskfox',e:'🦊',r:2},
+ {n:'Cragon',e:'🐲',r:3},{n:'Tidalume',e:'🐙',r:3},{n:'Hootflare',e:'🦉',r:3},
+ {n:'Lunaray',e:'🦄',r:4},{n:'Solwing',e:'🦅',r:4}
+].map((s,i)=>({...s,id:i}));
+const WEIGHT={1:60,2:28,3:10,4:2};
+const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
+const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
+
+/* ================= State ================= */
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0};
+let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
+let SIM=false;   // not saved: every launch starts on real GPS
+const save=()=>localStorage.setItem(LS,JSON.stringify(S));
+const $=id=>document.getElementById(id);
+const level=x=>Math.floor(Math.sqrt(x/100))+1;
+const lvStart=l=>(l-1)*(l-1)*100;
+
+/* ================= Helpers ================= */
+function dist(a,b){const R=6371000,r=x=>x*Math.PI/180,dl=r(b.lat-a.lat),dg=r(b.lng-a.lng);
+  const h=Math.sin(dl/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h));}
+function mulberry(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+const hash=(a,b,c)=>{let h=2166136261;for(const v of [a,b,c]){h^=v;h=Math.imul(h,16777619);}return h>>>0;};
+let tTimer;function toast(h,ms=2200){const t=$('toast');t.innerHTML=h;t.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ms);}
+const vib=p=>navigator.vibrate&&navigator.vibrate(p);
+const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
+
+/* ================= Map (vector tiles, sharp at any zoom) ================= */
+const STYLE_URLS=['https://tiles.openfreemap.org/styles/dark','https://tiles.openfreemap.org/styles/positron'];
+const FALLBACK_STYLE={version:8,sources:{esri:{type:'raster',tileSize:256,maxzoom:16,attribution:'Tiles © Esri',
+  tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}']}},
+  layers:[{id:'esri',type:'raster',source:'esri',paint:{'raster-brightness-max':.62,'raster-contrast':.5}}]};
+
+/* Recolor any OpenMapTiles-based style into the black / white hairline look. */
+function themeStyle(s){
+  const has=(id,...w)=>w.some(x=>id.includes(x));
+  s.layers.forEach(l=>{
+    const id=(l.id||'').toLowerCase();l.paint=l.paint||{};l.layout=l.layout||{};
+    const hide=()=>{l.layout.visibility='none';};
+    switch(l.type){
+      case 'background': l.paint['background-color']='#050608';delete l.paint['background-pattern'];break;
+      case 'fill':
+        delete l.paint['fill-pattern'];
+        if(has(id,'water','ocean','sea','lake','river'))l.paint['fill-color']='#0c1218';
+        else if(has(id,'building'))l.paint['fill-color']='#0d1015',l.paint['fill-outline-color']='#1b212a';
+        else if(has(id,'park','wood','forest','grass','garden','green','nature','landcover'))l.paint['fill-color']='#0a0e0c';
+        else l.paint['fill-color']='#080b0d';
+        break;
+      case 'fill-extrusion': l.paint['fill-extrusion-color']='#0d1015';delete l.paint['fill-extrusion-pattern'];break;
+      case 'line':
+        delete l.paint['line-pattern'];
+        if(l['source-layer']==='transportation')l.minzoom=13;
+        if(has(id,'casing','outline','bridge_casing')){hide();break;}
+        if(has(id,'boundary','admin')){l.paint['line-color']='#262d36';break;}
+        if(l['source-layer']==='transportation')l.paint['line-color']=['match',['get','class'],['path','pedestrian','steps','footway','cycleway'],'#2d343c',['rail','transit'],'#2a3038','#6f7984'];
+        else if(has(id,'water'))l.paint['line-color']='#0c1218';
+        else if(has(id,'motorway','trunk','primary','secondary','tertiary','minor','service','street','track','residential','road'))l.paint['line-color']='#6f7984';
+        else if(has(id,'path','pedestrian','footway','steps','cycle'))l.paint['line-color']='#2d343c';
+        else if(has(id,'rail','transit'))l.paint['line-color']='#2a3038';
+        else l.paint['line-color']='#3a414a';
+        break;
+      case 'symbol':
+        if(has(id,'poi','housenumber','shield','airport','aerodrome')||!l.layout['text-field']){hide();break;}
+        l.paint['text-color']=has(id,'place','city','town','village','state','country','continent','suburb')?'#c7cfd8':has(id,'water')?'#4f5a66':'#8b96a2';
+        l.paint['text-halo-color']='#000';l.paint['text-halo-width']=1.5;l.paint['icon-opacity']=0;
+        if(has(id,'place','city','town','village','suburb')){l.layout['text-transform']='uppercase';l.layout['text-letter-spacing']=0.12;}
+        break;
+      case 'hillshade':case 'raster':case 'heatmap':case 'color-relief': hide();break;
+    }
+  });
+  return s;
+}
+async function loadMapStyle(){
+  for(const u of STYLE_URLS){
+    try{const r=await fetch(u);if(!r.ok)continue;return themeStyle(await r.json());}catch(e){}
+  }
+  return FALLBACK_STYLE;
+}
+
+const map=new maplibregl.Map({
+  container:'map',center:[DEFAULT_POS.lng,DEFAULT_POS.lat],zoom:17,minZoom:-2,maxZoom:19.5,
+  style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#050608'}}]},
+  attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false
+});
+map.touchZoomRotate.disableRotation();
+map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
+
+let player={...DEFAULT_POS}, gotFix=false;
+
+function circleLine(c,r,n=72){
+  const dLat=r/111320,dLng=r/(111320*Math.cos(c.lat*Math.PI/180)),pts=[];
+  for(let i=0;i<=n;i++){const a=i/n*2*Math.PI;pts.push([c.lng+dLng*Math.cos(a),c.lat+dLat*Math.sin(a)]);}
+  return {type:'Feature',geometry:{type:'LineString',coordinates:pts}};
+}
+function addRange(){
+  if(map.getSource('range'))return;
+  map.addSource('range',{type:'geojson',data:circleLine(player,CATCH_RANGE)});
+  map.addLayer({id:'range',type:'line',source:'range',paint:{'line-color':'#ffffff','line-width':1,'line-dasharray':[2,3],'line-opacity':.85}});
+}
+map.on('style.load',addRange);
+let styleReady=false;
+loadMapStyle().then(s=>{map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
+
+function mkMarker(html,lng,lat,onClick,z){
+  const el=document.createElement('div');el.innerHTML=html;
+  if(z)el.style.zIndex=z;
+  if(onClick)el.addEventListener('click',e=>{e.stopPropagation();onClick();});else el.style.pointerEvents='none';
+  const mk=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat([lng,lat]).addTo(map);
+  return {mk,el};
+}
+const me=mkMarker('<div class="me"></div>',player.lng,player.lat,null,10);
+me.el.classList.add('keep');
+
+function setReadout(){$('mode').textContent=SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING');}
+function setPlayer(lat,lng,pan){
+  player={lat,lng};
+  me.mk.setLngLat([lng,lat]);
+  const src=map.getSource('range');if(src)src.setData(circleLine(player,CATCH_RANGE));
+  if(pan)map.easeTo({center:[lng,lat],duration:600});
+  setReadout();refresh();maybeFetchStops();ensureMission();renderMission();
+}
+map.on('click',e=>{if(SIM)setPlayer(e.lngLat.lat,e.lngLat.lng,false);});
+map.on('dragstart',()=>document.body.dataset.follow='0');
+
+/* ================= Location (asks on load) ================= */
+let watchId=null;
+const GATE={
+  ask:['Allow location','Wildwalk places you on the map using your location. Tap Allow when your browser asks.'],
+  denied:['Location is blocked','Tap the icon left of the address bar, then Permissions, then Location, and choose Allow. Make sure Location is also on in your phone quick settings. Then press Enable location.'],
+  off:['Location is off','Turn on Location in your phone quick settings, then press Enable location.'],
+  timeout:['Searching for GPS','No position yet. Go outside or next to a window, then press Enable location.']
+};
+function showGate(k){$('gT').textContent=GATE[k][0];$('gP').textContent=GATE[k][1];$('gate').classList.add('open');}
+function hideGate(){$('gate').classList.remove('open');}
+function onGPS(p){
+  if(SIM)return;
+  const first=!gotFix;gotFix=true;hideGate();
+  setPlayer(p.coords.latitude,p.coords.longitude,!first&&document.body.dataset.follow==='1');
+  if(first)map.jumpTo({center:[player.lng,player.lat],zoom:17});
+}
+function onGPSErr(e){
+  if(gotFix||SIM)return;
+  showGate(e.code===1?'denied':e.code===2?'off':'timeout');
+  $('gS').textContent=e.code===1?'Chrome says: permission denied.':e.code===2?'Your phone says: location unavailable.':'No GPS signal yet.';
+  setReadout();
+}
+function startGPS(){
+  if(!navigator.geolocation){showGate('off');return;}
+  if(watchId!==null)navigator.geolocation.clearWatch(watchId);
+  watchId=navigator.geolocation.watchPosition(onGPS,onGPSErr,{enableHighAccuracy:true,maximumAge:3000,timeout:20000});
+}
+$('gTry').onclick=()=>{
+  const b=$('gTry');b.textContent='Checking...';b.disabled=true;$('gS').textContent='';
+  startGPS();
+  if(navigator.geolocation)navigator.geolocation.getCurrentPosition(onGPS,onGPSErr,{enableHighAccuracy:true,timeout:12000,maximumAge:0});
+  setTimeout(()=>{
+    b.textContent='Enable location';b.disabled=false;
+    if(!gotFix&&$('gate').classList.contains('open')&&!$('gS').textContent)$('gS').textContent='Still no location. If Chrome blocked it, fix it in the address bar lock icon, then tap the button again.';
+  },2200);
+};
+$('gSim').onclick=()=>{hideGate();setSim(true);};
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!gotFix&&!SIM)startGPS();});
+
+/* ================= Spawns ================= */
+const spawnMarkers={};
+function spawnsAround(center,now=Date.now()){
+  const win=Math.floor(now/WINDOW), out=[];
+  const ci=Math.floor(center.lat/CELL);
+  for(let i=ci-4;i<=ci+4;i++){
+    const latC=(i+.5)*CELL, lngSize=CELL/Math.cos(latC*Math.PI/180);
+    const cj=Math.floor(center.lng/lngSize);
+    for(let j=cj-5;j<=cj+5;j++){
+      const rnd=mulberry(hash(i,j,win)), c=rnd(), n=c<.3?0:c<.8?1:2;
+      for(let k=0;k<n;k++){
+        let w=rnd()*100,r=4;for(const rr of [1,2,3,4]){w-=WEIGHT[rr];if(w<0){r=rr;break;}}
+        const pool=SPECIES.filter(s=>s.r===r),sp=pool[Math.floor(rnd()*pool.length)];
+        const id=`${i}_${j}_${win}_${k}`;
+        out.push({id,sp,lat:i*CELL+rnd()*CELL,lng:j*lngSize+rnd()*lngSize,expires:(win+1)*WINDOW});
+      }
+    }
+  }
+  return out;
+}
+const crHTML=(s,near)=>`<div class="cr r${s.sp.r}${near?' near':''}"><i></i><b>${s.sp.e}</b><span>${s.sp.n}</span></div>`;
+function refresh(){
+  const now=Date.now(),list=spawnsAround(player,now).filter(s=>!S.gone[s.id]&&dist(player,s)<900);
+  const keep=new Set(list.map(s=>s.id));
+  for(const id in spawnMarkers)if(!keep.has(id)){spawnMarkers[id].mk.remove();delete spawnMarkers[id];}
+  for(const s of list){
+    const near=dist(player,s)<=CATCH_RANGE;
+    let o=spawnMarkers[s.id];
+    if(!o){o=mkMarker(crHTML(s,near),s.lng,s.lat,()=>tapSpawn(s));o.near=near;spawnMarkers[s.id]=o;}
+    else if(o.near!==near){o.near=near;o.el.innerHTML=crHTML(s,near);}
+  }
+  for(const id in S.gone){if(S.gone[id]<now-70*60e3)delete S.gone[id];}
+  refreshStops();
+}
+function tapSpawn(s){
+  const d=dist(player,s);
+  if(d>CATCH_RANGE){toast(`${s.sp.n}<small>${Math.round(d)} m away · get within ${CATCH_RANGE} m</small>`);return;}
+  openCatch(s);
+}
+
+/* ================= Catch minigame ================= */
+let cur=null,raf=null,ringR=120;
+const TARGET_R=40;
+function openCatch(s){
+  cur={s,misses:0};
+  $('cName').textContent=s.sp.n;$('cSub').textContent=`${RNAME[s.sp.r]} · ${pips(s.sp.r)}`;
+  $('beast').textContent=s.sp.e;
+  $('cTip').textContent='Throw when the ring meets the dashed circle';
+  $('target').style.width=$('target').style.height=TARGET_R*2+'px';
+  $('catch').classList.add('open');startRing();updateHud();
+}
+function startRing(){
+  cancelAnimationFrame(raf);const t0=performance.now();
+  const speed=1500-cur.s.sp.r*180;
+  const step=t=>{const p=((t-t0)%speed)/speed;ringR=125-(125-16)*p;
+    const r=$('ring');r.style.width=r.style.height=ringR*2+'px';raf=requestAnimationFrame(step);};
+  raf=requestAnimationFrame(step);
+}
+function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
+$('runBtn').onclick=closeCatch;
+$('throwBtn').onclick=()=>{
+  if(!cur)return;
+  if(S.orbs<=0){toast('Out of orbs<small>Visit a stop to resupply</small>',2600);closeCatch();return;}
+  S.orbs--;
+  const tol=22-cur.s.sp.r*3, off=Math.abs(ringR-TARGET_R);
+  if(off<=tol){
+    const sp=cur.s.sp,great=off<=tol/3;
+    const cp=Math.round(sp.r*120+Math.random()*180+(great?40:0));
+    const d=S.dex[sp.id]||{count:0,best:0};d.count++;d.best=Math.max(d.best,cp);S.dex[sp.id]=d;
+    const old=level(S.xp),xp=40*sp.r+(d.count===1?100:0)+(great?25:0);S.xp+=xp;
+    S.gone[cur.s.id]=Date.now();save();
+    vib([60,40,120]);
+    const note=missionEvent('catch',{r:sp.r});
+    toast(`${great?'Perfect · ':''}Captured ${sp.n}<small>CP ${cp} · +${xp} XP${d.count===1?' · new specimen':''}${level(S.xp)>old?` · level ${level(S.xp)}`:''}${note?' · '+note:''}</small>`,3400);
+    closeCatch();
+  }else{
+    cur.misses++;vib(80);
+    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(`${cur.s.sp.n} escaped`);closeCatch();}
+    else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
+  }
+  updateHud();
+};
+
+/* ================= Stops: real places (OpenStreetMap) + supply caches (always around you) ================= */
+let stops=[],stopMarkers={},lastFetch=null,fetching=false,warned=false,stopsReady=false,retryT=null;
+const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter','https://maps.mail.ru/osm/tools/overpass/api/interpreter'];
+const STOP_EMOJI={museum:'🏛️',artwork:'🎨',viewpoint:'🔭',attraction:'⭐',gallery:'🖼️',park:'🌳',garden:'🌷',playground:'🛝',cafe:'☕',library:'📚',fountain:'⛲',place_of_worship:'⛪',monument:'🗿',memorial:'🕯️',castle:'🏰',ruins:'🏚️',drinking_water:'💧',ice_cream:'🍦',marketplace:'🧺',pub:'🍺'};
+function stopEmoji(t){for(const k of [t.tourism,t.leisure,t.amenity,t.historic])if(k&&STOP_EMOJI[k])return STOP_EMOJI[k];return '◆';}
+function overpassQuery(){
+  const a=`(around:1200,${player.lat},${player.lng})`;
+  return `[out:json][timeout:25];(nwr${a}[tourism~"museum|artwork|viewpoint|attraction|gallery"];nwr${a}[leisure~"park|garden|playground"];nwr${a}[amenity~"cafe|library|fountain|place_of_worship|drinking_water|ice_cream|marketplace|pub"];nwr${a}[historic~"monument|memorial|castle|ruins"];);out center 140;`;
+}
+async function fetchOverpass(q){
+  for(const url of OVERPASS){
+    try{
+      const ctl=new AbortController(),to=setTimeout(()=>ctl.abort(),16000);
+      const r=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(q),signal:ctl.signal});
+      clearTimeout(to);
+      if(!r.ok)continue;
+      return await r.json();
+    }catch(e){}
+  }
+  return null;
+}
+async function maybeFetchStops(){
+  if(fetching)return;
+  if(lastFetch&&dist(player,lastFetch)<350)return;
+  const key='ww.stops2.'+player.lat.toFixed(3)+'.'+player.lng.toFixed(3);
+  try{
+    const c=JSON.parse(localStorage.getItem(key)||'null');
+    if(c&&Date.now()-c.t<12*3600e3&&c.d&&c.d.length){stops=c.d;lastFetch={...player};stopsReady=true;refreshStops();ensureMission();return;}
+  }catch(e){}
+  fetching=true;
+  const j=await fetchOverpass(overpassQuery());
+  if(j&&j.elements){
+    stops=j.elements.map(e=>{
+      const la=e.lat!=null?e.lat:(e.center&&e.center.lat),lo=e.lon!=null?e.lon:(e.center&&e.center.lon);
+      return la==null?null:{id:e.type[0]+e.id,lat:la,lng:lo,name:(e.tags&&e.tags.name)||'Landmark',e:stopEmoji(e.tags||{})};
+    }).filter(Boolean);
+    try{localStorage.setItem(key,JSON.stringify({t:Date.now(),d:stops}));}catch(_){}
+    lastFetch={...player};
+  }else{
+    if(!warned){warned=true;toast('Could not load places<small>Supply caches still work</small>',2800);}
+    clearTimeout(retryT);retryT=setTimeout(()=>{lastFetch=null;maybeFetchStops();},45000);
+  }
+  fetching=false;stopsReady=true;refreshStops();ensureMission();
+}
+
+/* supply caches: generated around you, refresh every 30 minutes, independent of OpenStreetMap */
+const SWIN=30*60e3,SCELL=0.0030;
+function suppliesAround(c,now=Date.now()){
+  const win=Math.floor(now/SWIN),out=[],ci=Math.floor(c.lat/SCELL);
+  for(let i=ci-4;i<=ci+4;i++){
+    const latC=(i+.5)*SCELL,lngSize=SCELL/Math.cos(latC*Math.PI/180),cj=Math.floor(c.lng/lngSize);
+    for(let j=cj-4;j<=cj+4;j++){
+      const rnd=mulberry(hash(i+7919,j+104729,win));
+      if(rnd()<.6){
+        const s={id:`s${i}_${j}_${win}`,lat:i*SCELL+rnd()*SCELL,lng:j*lngSize+rnd()*lngSize,name:'Supply cache',e:'◈',supply:true};
+        if(!S.gone[s.id]&&dist(c,s)<800)out.push(s);
+      }
+    }
+  }
+  return out;
+}
+const stopHTML=(s,cd,near,tgt)=>`<div class="stop${s.supply?' supply':''}${cd?' cd':''}${near&&!cd?' near':''}${tgt?' target':''}"><b>${s.e}</b></div>`;
+function refreshStops(){
+  const now=Date.now(),m=S.mission;
+  const list=stops.filter(s=>dist(player,s)<1500).concat(suppliesAround(player,now));
+  if(m&&m.type==='visit'&&!list.find(x=>x.id===m.id)&&!(m.supply&&S.gone[m.id]))list.push({id:m.id,lat:m.lat,lng:m.lng,name:m.name,e:m.e,supply:!!m.supply});
+  const ids=new Set(list.map(s=>s.id));
+  for(const id in stopMarkers)if(!ids.has(id)){stopMarkers[id].mk.remove();delete stopMarkers[id];}
+  for(const s of list){
+    const cd=!s.supply&&(S.stopCd[s.id]||0)>now-STOP_COOLDOWN,near=dist(player,s)<=STOP_RANGE,tgt=!!(m&&m.type==='visit'&&m.id===s.id);
+    const key=''+cd+near+tgt;
+    let o=stopMarkers[s.id];
+    if(!o){o=mkMarker(stopHTML(s,cd,near,tgt),s.lng,s.lat,()=>tapStop(s));o.key=key;stopMarkers[s.id]=o;}
+    else if(o.key!==key){o.key=key;o.el.innerHTML=stopHTML(s,cd,near,tgt);}
+  }
+}
+function tapStop(s){
+  const d=dist(player,s);
+  if(d>STOP_RANGE){toast(`${s.name}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
+  if(!s.supply){
+    const left=STOP_COOLDOWN-(Date.now()-(S.stopCd[s.id]||0));
+    if(left>0){toast(`${s.name}<small>Recharging · ${Math.ceil(left/60000)} min</small>`);return;}
+  }
+  const lv=level(S.xp),n=3+Math.floor(Math.random()*3)+Math.floor(lv/5),xp=s.supply?20:25;
+  S.orbs+=n;S.xp+=xp;
+  if(s.supply)S.gone[s.id]=Date.now();else S.stopCd[s.id]=Date.now();
+  save();vib(60);
+  const note=missionEvent('visit',{id:s.id});
+  toast(`${s.name}<small>+${n} orbs · +${xp} XP${note?' · '+note:''}</small>`,3000);
+  updateHud();refreshStops();
+}
+
+/* ================= Missions (a travel mission every second mission) ================= */
+const mType=i=>i%2===0?'visit':(Math.floor(i/2)%2===0?'catch':'rare');
+function visitCandidates(maxD){
+  const now=Date.now(),pool=stops.filter(s=>(S.stopCd[s.id]||0)<now-STOP_COOLDOWN).concat(suppliesAround(player,now));
+  return pool.map(s=>({s,d:dist(player,s)})).filter(o=>o.d>STOP_RANGE+60&&o.d<maxD)
+    .sort((a,b)=>(!!a.s.supply-!!b.s.supply)||((a.s.name==='Landmark')-(b.s.name==='Landmark'))||a.d-b.d);
+}
+function newMission(){
+  const type=mType(S.mIdx);
+  if(type==='visit'){
+    let c=visitCandidates(1500);
+    if(!c.length)c=visitCandidates(3000);
+    if(c.length){
+      const o=c[Math.floor(Math.random()*Math.min(3,c.length))],s=o.s;
+      return {type:'visit',id:s.id,name:s.name,e:s.e,lat:s.lat,lng:s.lng,supply:!!s.supply,xp:Math.max(50,Math.min(160,Math.round(40+o.d/10)))};
+    }
+  }
+  if(type==='rare')return {type:'rare',need:1,have:0,minR:2,xp:120};
+  return {type:'catch',need:3+Math.floor(level(S.xp)/6),have:0,xp:80};
+}
+function ensureMission(){
+  if(S.mission&&S.mission.type==='visit'&&dist(player,S.mission)>2500)S.mission=null;
+  if(!S.mission){
+    if(mType(S.mIdx)==='visit'&&!stopsReady)return;
+    S.mission=newMission();save();refreshStops();
+  }
+}
+function missionEvent(kind,data){
+  const m=S.mission;if(!m)return '';
+  let done=false;
+  if(kind==='visit'&&m.type==='visit'&&m.id===data.id)done=true;
+  if(kind==='catch'){
+    if(m.type==='catch'){m.have++;done=m.have>=m.need;}
+    else if(m.type==='rare'&&data.r>=m.minR){m.have++;done=m.have>=m.need;}
+  }
+  if(done){
+    const x=m.xp;S.xp+=x;S.mIdx++;S.mission=null;save();ensureMission();renderMission();updateHud();
+    return `mission complete +${x} XP`;
+  }
+  save();renderMission();return '';
+}
+function renderMission(){
+  const m=S.mission,t=$('mt'),d=$('md');
+  if(!m){t.textContent='Scanning for missions';d.textContent='';return;}
+  if(m.type==='visit'){
+    t.textContent='Travel to '+m.name;
+    const x=dist(player,m);d.textContent=x<=STOP_RANGE?'IN RANGE':fmtD(x);
+  }else if(m.type==='catch'){t.textContent=`Capture ${m.need} creatures`;d.textContent=`${m.have}/${m.need}`;}
+  else{t.textContent='Capture 1 uncommon or better';d.textContent=`${m.have}/${m.need}`;}
+}
+$('mq').onclick=()=>{
+  const m=S.mission;
+  if(m&&m.type==='visit'){document.body.dataset.follow='0';map.easeTo({center:[m.lng,m.lat],duration:700});}
+};
+
+/* ================= HUD / Dex ================= */
+function updateHud(){
+  const l=level(S.xp),a=lvStart(l),b=lvStart(l+1);
+  $('lvl').textContent='LV '+String(l).padStart(2,'0');
+  $('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';
+  $('orbs').textContent='ORB '+S.orbs;
+  save();
+}
+function renderDex(){
+  $('build').textContent=BUILD;
+  const have=Object.keys(S.dex).length;
+  $('dexT').textContent=`Dex ${String(have).padStart(2,'0')}/${SPECIES.length}`;
+  $('dexG').innerHTML=SPECIES.map(s=>{const d=S.dex[s.id];
+    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'Unknown'}</b><span class="pips">${pips(s.r)}</span>${d?`CP ${d.best} · x${d.count}`:RNAME[s.r]}</div>`;}).join('');
+  $('simSw').classList.toggle('on',SIM);
+}
+$('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
+$('dexX').onclick=()=>$('dex').classList.remove('open');
+$('reset').onclick=()=>{if(confirm('Reset all progress?')){localStorage.removeItem(LS);location.reload();}};
+$('bLoc').onclick=()=>{document.body.dataset.follow='1';map.easeTo({center:[player.lng,player.lat],zoom:Math.max(map.getZoom(),17),duration:600});};
+
+function setSim(on){
+  SIM=on;
+  $('bSim').classList.toggle('on',on);$('hint').style.display=on?'block':'none';
+  $('simSw').classList.toggle('on',on);setReadout();
+  if(!on&&!gotFix)startGPS();
+}
+$('bSim').onclick=()=>setSim(!SIM);
+$('simSw').onclick=()=>setSim(!SIM);
+
+/* ================= Orbit cinematic: map to space ================= */
+const ZH=3.6, FOV=30*Math.PI/180, SUN=(()=>{const v=[-.62,.30,.72],l=Math.hypot(...v);return v.map(x=>x/l);})();
+let orbit=false,returning=false,fallbackGlobe=false,spinRAF=null,dragging=false,orbitToken=0,hiddenLabels=[];
+
+/* --- labels: hidden for the whole flight --- */
+function hideLabels(){
+  hiddenLabels=[];
+  ((map.getStyle()||{}).layers||[]).forEach(l=>{
+    if(l.type==='symbol'&&map.getLayoutProperty(l.id,'visibility')!=='none'){map.setLayoutProperty(l.id,'visibility','none');hiddenLabels.push(l.id);}
+  });
+}
+function showLabels(){hiddenLabels.forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});hiddenLabels=[];}
+
+/* --- satellite crossfade on the flat map --- */
+function ensureSat(){
+  if(map.getSource('sat'))return;
+  map.addSource('sat',{type:'raster',tileSize:256,maxzoom:8,attribution:'Imagery © Esri',
+    tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']});
+  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-brightness-max':.8,'raster-contrast':.12}});
+}
+function updateSat(){
+  const z=map.getZoom();
+  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/2.5)):0);
+}
+function setTelem(f){
+  f=Math.max(0,Math.min(1,f));
+  const alt=0.5*Math.pow(816,f),vel=7.66*Math.min(1,f*1.15);
+  $('alt').textContent=alt<1?Math.round(alt*1000)+' M':Math.round(alt).toLocaleString('en-US')+' KM';
+  $('vel').textContent=vel.toFixed(2)+' KM/S';
+}
+map.on('zoom',()=>{
+  updateSat();
+  if(!orbit)return;
+  const z=map.getZoom();
+  if(!E.active)setTelem(.55*Math.max(0,Math.min(1,(17-z)/(17-ZH))));
+  if(returning&&z>9)document.body.classList.remove('orbit');
+  if(returning&&z>10&&hiddenLabels.length)showLabels();
+});
+
+/* ================= Earth renderer (WebGL2 shader): black space, thin atmosphere, glossy water, graded continents ================= */
+const E={cv:$('earth'),gl:null,prog:null,u:{},loading:null,active:false,state:'idle',hasNight:0,
+         latA:0,lonA:0,lat0:0,lon0:0,D:5,Dh:2,Dend:11,lnD:0,f:0,ts:0,last:0,time:0,drag:false,lnD0:0,f0:0};
+const VS='#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}';
+const FS=`#version 300 es
+precision highp float;
+uniform vec2 uRes;uniform float uD,uFov,uT,uRoll;
+uniform vec3 uX,uY,uZ;
+uniform sampler2D uDay;
+out vec4 oc;
+const float PI=3.14159265359;
+float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+  return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
+vec3 ngrad(vec3 p){float e=.08;
+  return vec3(noise(p+vec3(e,0,0))-noise(p-vec3(e,0,0)),noise(p+vec3(0,e,0))-noise(p-vec3(0,e,0)),noise(p+vec3(0,0,e))-noise(p-vec3(0,0,e)))/(2.*e);}
+float lumOf(vec3 c){return dot(c,vec3(.3,.59,.11));}
+float waterOf(vec3 c){return smoothstep(.01,.06,c.b-c.r)*smoothstep(-.04,.0,c.b-c.g)*(1.-smoothstep(.28,.5,lumOf(c)));}
+vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*uRes)/(.5*uRes.y);
+  float cr=cos(uRoll),sr=sin(uRoll);uv=mat2(cr,-sr,sr,cr)*uv;
+  float tf=tan(uFov*.5);
+  vec3 rd=normalize(vec3(uv*tf,-1.));
+  vec3 ro=vec3(0.,0.,uD);
+  float b=dot(ro,rd),disc=b*b-(dot(ro,ro)-1.);
+  vec3 pc=ro-rd*b;float dmin=length(pc);
+  float px=uD*2.*tf/uRes.y;
+  float cover=clamp((1.-dmin)/px+.5,0.,1.);
+  vec3 p=ro+rd*(-b-sqrt(max(disc,0.)));
+  vec3 n=normalize(p);
+  vec3 nl=uX*n.x+uY*n.y+uZ*n.z;
+  float lat=asin(clamp(nl.y,-1.,1.)),lon=atan(nl.x,nl.z);
+  float la=clamp(lat,-1.4844,1.4844);
+  vec2 uvA=vec2(lon/(2.*PI)+.5,clamp(.5-log(tan(PI*.25+la*.5))/(2.*PI),0.,1.));
+  vec2 uvB=vec2(fract(uvA.x+.5)-.5,uvA.y);
+  vec2 dxA=dFdx(uvA),dyA=dFdy(uvA),dxB=dFdx(uvB),dyB=dFdy(uvB);
+  bool useB=dot(dxA,dxA)+dot(dyA,dyA)>dot(dxB,dxB)+dot(dyB,dyB);
+  vec2 gx=useB?dxB:dxA,gy=useB?dyB:dyA;
+  vec3 dayT=textureGrad(uDay,uvA,gx,gy).rgb;
+  vec3 blurT=textureLod(uDay,uvA,3.5).rgb;
+
+  /* a slow travelling light gives the water its sheen; there is no day or night */
+  vec3 L=normalize(vec3(-.55+.40*sin(uT*.23),.50+.18*cos(uT*.19),.70));
+  vec3 vv=normalize(ro-p);
+  float ndv=max(dot(n,vv),0.);
+  float diff=.46+.54*smoothstep(-.35,1.,dot(n,L));
+
+  float w=waterOf(dayT),wb=waterOf(blurT);
+  float coast=w*(1.-wb);
+  float lum=lumOf(dayT);
+
+  /* land: deep, graded colour with relief shading taken from the imagery brightness */
+  vec3 land=pow(textureLod(uDay,uvA,3.).rgb,vec3(1.22));
+  land=mix(vec3(lumOf(land)),land,1.18);
+  land*=.80;
+  land=mix(land,vec3(.50,.58,.68),smoothstep(1.25,1.42,abs(lat)));
+  land*=diff;
+
+  /* water: one flat colour everywhere, no sun reflection */
+  vec3 wcol=vec3(.010,.085,.205);
+
+  vec3 col=mix(land,wcol,w);
+
+  /* limb darkening, blue haze and a thin bright rim */
+  col*=mix(.60,1.,smoothstep(0.,.5,ndv));
+  col=mix(col,vec3(.12,.34,.80),pow(1.-ndv,3.)*.45);
+  col+=vec3(.30,.62,1.)*pow(1.-ndv,6.)*1.1+vec3(.75,.92,1.)*pow(1.-ndv,16.)*1.6;
+
+  /* tight atmosphere glow, then pure black */
+  float h=max(dmin-1.,0.);
+  float g=(exp(-h*70.)*.95+exp(-h*28.)*.22+exp(-h*300.))*(1.-smoothstep(.10,.26,h));
+  g*=.65+.35*clamp(dot(pc/max(dmin,1e-4),L)*.5+.5,0.,1.);
+  vec3 outer=mix(vec3(.16,.40,1.),vec3(.6,.88,1.),exp(-h*140.))*g;
+
+  vec3 res=mix(outer,col,cover);
+  res=aces(res*.95);
+  res=pow(res,vec3(1./2.2));
+  float lm=max(res.r,max(res.g,res.b));
+  res+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.012*smoothstep(.03,.2,lm);
+  res=max(res-.004,0.);
+  oc=vec4(res,1.);
+}`;
+
+function earthInit(){
+  if(E.gl)return true;
+  try{
+    const gl=E.cv.getContext('webgl2',{antialias:false,alpha:false,powerPreference:'high-performance'});
+    if(!gl)return false;
+    const sh=(t,s)=>{const o=gl.createShader(t);gl.shaderSource(o,s);gl.compileShader(o);if(!gl.getShaderParameter(o,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(o));return o;};
+    const pr=gl.createProgram();
+    gl.attachShader(pr,sh(gl.VERTEX_SHADER,VS));gl.attachShader(pr,sh(gl.FRAGMENT_SHADER,FS));gl.linkProgram(pr);
+    if(!gl.getProgramParameter(pr,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(pr));
+    ['uRes','uD','uFov','uT','uRoll','uX','uY','uZ','uDay'].forEach(k=>E.u[k]=gl.getUniformLocation(pr,k));
+    E.gl=gl;E.prog=pr;
+    return true;
+  }catch(e){console.warn('earth init failed',e);return false;}
+}
+function makeTex(canvasOrData,unit,isCanvas){
+  const gl=E.gl,t=gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
+  if(isCanvas){
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    const ex=gl.getExtension('EXT_texture_filter_anisotropic');
+    if(ex)gl.texParameterf(gl.TEXTURE_2D,ex.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(ex.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  }else{
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  }
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  return t;
+}
+function loadMosaic(urlFn,z){
+  return new Promise(res=>{
+    const n=1<<z,c=document.createElement('canvas');c.width=c.height=n*256;
+    const g=c.getContext('2d');let left=n*n,ok=0;
+    const done=()=>{if(--left===0)res(ok>=n*n*.8?c:null);};
+    for(let x=0;x<n;x++)for(let y=0;y<n;y++){
+      const im=new Image();im.crossOrigin='anonymous';
+      im.onload=()=>{g.drawImage(im,x*256,y*256);ok++;done();};
+      im.onerror=done;
+      im.src=urlFn(z,x,y);
+    }
+  });
+}
+function earthPrepare(){
+  if(E.loading)return E.loading;
+  E.loading=(async()=>{
+    if(!earthInit())return false;
+    const day=await loadMosaic((z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,3);
+    if(!day)return false;
+    try{
+      E.texDay=makeTex(day,0,true);
+    }catch(e){console.warn('texture upload failed',e);return false;}
+    return true;
+  })();
+  return E.loading;
+}
+function earthSize(){
+  const dpr=Math.min(devicePixelRatio||1,2);
+  E.cv.width=Math.round(innerWidth*dpr);E.cv.height=Math.round(innerHeight*dpr);
+  if(E.gl)E.gl.viewport(0,0,E.cv.width,E.cv.height);
+}
+addEventListener('resize',()=>{if(E.active)earthSize();});
+function camBasis(lat,lon){
+  const cl=Math.cos(lat),sl=Math.sin(lat),co=Math.cos(lon),so=Math.sin(lon);
+  return {z:[cl*so,sl,cl*co],y:[-sl*so,cl,-sl*co],x:[co,0,-so]};
+}
+const hAtZoom=(z,lat)=>(6.2907*Math.cos(lat)/(512*Math.pow(2,z)))*innerHeight/(2*Math.tan(FOV/2));
+function earthDraw(){
+  const gl=E.gl,b=camBasis(E.latA+Math.sin(E.time*.31)*.012,E.lonA);
+  gl.useProgram(E.prog);
+  gl.uniform2f(E.u.uRes,E.cv.width,E.cv.height);
+  gl.uniform1f(E.u.uD,E.D);gl.uniform1f(E.u.uFov,FOV);gl.uniform1f(E.u.uT,E.time);
+  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012);
+  gl.uniform3fv(E.u.uX,b.x);gl.uniform3fv(E.u.uY,b.y);gl.uniform3fv(E.u.uZ,b.z);
+  gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,E.texDay);gl.uniform1i(E.u.uDay,0);
+  gl.drawArrays(gl.TRIANGLES,0,3);
+}
+const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
+function earthFrame(){
+  if(!E.active)return;
+  const now=performance.now()/1000,dt=Math.min(.05,now-E.last);E.last=now;E.time+=dt;
+  let lnD,f;
+  if(E.state==='in'){
+    const p=Math.min(1,(now-E.ts)/4.6),e=1-Math.pow(1-p,3);
+    lnD=Math.log(E.Dh)+(Math.log(E.Dend)-Math.log(E.Dh))*e;f=.55+.45*e;
+    E.latA+=(0.36-E.latA)*(1-Math.exp(-dt*.9));
+    if(!E.drag)E.lonA-=0.09*dt;
+    if(p>=1)E.state='spin';
+  }else if(E.state==='spin'){
+    lnD=Math.log(E.Dend);f=1;
+    if(!E.drag){E.lonA-=0.09*dt;E.latA+=(0.36-E.latA)*(1-Math.exp(-dt*.9));}
+  }else{
+    const p=Math.min(1,(now-E.ts)/3.8),e=p*p*p;
+    lnD=E.lnD0+(Math.log(E.Dh)-E.lnD0)*e;f=E.f0+(.55-E.f0)*e;
+    E.latA+=(E.lat0-E.latA)*(1-Math.exp(-dt*(1.5+5*e)));
+    E.lonA+=wrapA(E.lon0-E.lonA)*(1-Math.exp(-dt*(1.5+6*e)));
+    if(p>=1){earthStop();return;}
+  }
+  E.lnD=lnD;E.f=f;E.D=Math.exp(lnD);setTelem(f);
+  earthDraw();
+  requestAnimationFrame(earthFrame);
+}
+function earthStart(){
+  $('rend').textContent='Wildwalk · '+BUILD+' · GPU';
+  earthSize();
+  E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;
+  E.latA=E.lat0;E.lonA=E.lon0;
+  const H=innerHeight,W=innerWidth,tf=Math.tan(FOV/2),rad=.40*Math.min(W,H);
+  E.Dh=1+hAtZoom(ZH,E.lat0);
+  E.Dend=Math.sqrt(1+Math.pow(H/(2*rad*tf),2));
+  E.D=E.Dh;E.state='in';E.ts=E.last=performance.now()/1000;E.time=0;E.drag=false;E.active=true;
+  document.body.classList.add('earth-on','spun');
+  earthFrame();
+  setTimeout(()=>{if(E.active)$('map').style.visibility='hidden';},1100);
+}
+function earthStop(){
+  E.active=false;E.state='idle';
+  map.jumpTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0});
+  $('map').style.visibility='visible';
+  document.body.classList.remove('earth-on');
+  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:4600,curve:1.4,essential:true,easing:t=>1-Math.pow(1-t,1.8)});
+  map.on('moveend',function h(){if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}});
+}
+/* drag to spin the planet */
+(()=>{
+  let lx=0,ly=0,tm=null;
+  const radpx=()=>(innerHeight/2)/(Math.tan(FOV/2)*Math.sqrt(Math.max(E.D*E.D-1,.01)));
+  E.cv.addEventListener('pointerdown',e=>{if(!E.active||E.state==='out')return;E.drag=true;clearTimeout(tm);lx=e.clientX;ly=e.clientY;E.cv.setPointerCapture(e.pointerId);});
+  E.cv.addEventListener('pointermove',e=>{
+    if(!E.drag)return;const r=radpx();
+    E.lonA-=(e.clientX-lx)/r;E.latA=Math.max(-1.3,Math.min(1.3,E.latA+(e.clientY-ly)/r));lx=e.clientX;ly=e.clientY;
+  });
+  const up=()=>{if(!E.drag)return;tm=setTimeout(()=>{E.drag=false;},1600);};
+  E.cv.addEventListener('pointerup',up);E.cv.addEventListener('pointercancel',up);
+})();
+
+/* ================= Sequence control ================= */
+function startOrbit(){
+  if(orbit)return;
+  if(!styleReady){toast('Map is still loading');return;}
+  orbit=true;returning=false;fallbackGlobe=false;
+  const token=++orbitToken;
+  document.body.dataset.follow='0';
+  document.body.classList.add('orbit');
+  hideLabels();ensureSat();
+  const pre=earthPrepare();           // starts downloading the planet texture right away
+  setTelem(0);updateSat();
+  map.flyTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0,duration:4800,curve:1.4,essential:true,easing:t=>Math.pow(t,1.8)});
+  map.on('moveend',function h(){
+    if(!orbit||returning||token!==orbitToken){map.off('moveend',h);return;}
+    if(Math.abs(map.getZoom()-ZH)<.05){map.off('moveend',h);handoff(token,pre);}
+  });
+  vib([30,60,30]);
+}
+async function handoff(token,pre){
+  const ok=await Promise.race([pre,new Promise(r=>setTimeout(()=>r(false),8000))]);
+  if(token!==orbitToken||!orbit||returning)return;
+  if(ok)earthStart();else globeFallback();
+}
+/* fallback if WebGL2 or the planet texture is unavailable: MapLibre's own globe */
+function globeFallback(){
+  $('rend').textContent='Wildwalk · '+BUILD+' · MAP';
+  fallbackGlobe=true;
+  map.setProjection({type:'globe'});
+  try{map.setSky({'atmosphere-blend':['interpolate',['linear'],['zoom'],0,1,5,1,7,0]});}catch(e){}
+  const zTop=Math.max(-1,Math.log2(Math.min(innerWidth,innerHeight)*.40*2*Math.PI/512));
+  map.flyTo({center:[player.lng,18],zoom:zTop,pitch:0,bearing:0,duration:3500,essential:true});
+  document.body.classList.add('spun');
+  map.on('moveend',function h(){
+    if(orbit&&!returning&&Math.abs(map.getZoom()-zTop)<.05){map.off('moveend',h);beginSpin();}
+  });
+}
+function beginSpin(){
+  let last=performance.now();
+  const tick=t=>{
+    if(!orbit||returning)return;
+    const dt=Math.min(.05,(t-last)/1000);last=t;
+    if(!dragging){const c=map.getCenter();map.jumpTo({center:[c.lng+dt*5,c.lat]});}
+    spinRAF=requestAnimationFrame(tick);
+  };
+  spinRAF=requestAnimationFrame(tick);
+}
+map.on('dragstart',()=>{if(orbit)dragging=true;});
+map.on('dragend',()=>{if(orbit)setTimeout(()=>{dragging=false;},1800);});
+
+function endOrbit(){
+  if(!orbit||returning)return;
+  returning=true;
+  if(E.active){            // fly the camera back down to the map
+    E.state='out';E.ts=performance.now()/1000;E.lnD0=E.lnD;E.f0=E.f;
+    E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;E.drag=false;
+    return;
+  }
+  cancelAnimationFrame(spinRAF);dragging=false;map.stop();
+  map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:6000,curve:1.4,essential:true,easing:t=>1-Math.pow(1-t,1.8)});
+  map.on('moveend',function h(){if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}});
+}
+function finishOrbit(){
+  orbit=false;returning=false;
+  document.body.classList.remove('orbit','spun','earth-on');
+  $('map').style.visibility='visible';
+  document.body.dataset.follow='1';
+  if(fallbackGlobe){map.setProjection({type:'mercator'});fallbackGlobe=false;}
+  showLabels();updateSat();
+}
+$('bOrbit').onclick=startOrbit;
+$('ret').onclick=endOrbit;
+
+/* ================= Boot ================= */
+document.body.dataset.follow='1';
+updateHud();setReadout();renderMission();
+refresh();maybeFetchStops();
+(async()=>{
+  let state='prompt';
+  try{
+    const p=await navigator.permissions.query({name:'geolocation'});
+    state=p.state;
+    p.onchange=()=>{if(p.state==='granted'&&!gotFix&&!SIM)startGPS();};
+  }catch(e){}
+  if(state!=='granted')showGate(state==='denied'?'denied':'ask');
+  startGPS();
+})();
+setInterval(()=>{refresh();ensureMission();renderMission();},10000);
+</script>
+</body>
+</html>
