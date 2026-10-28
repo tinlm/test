@@ -1185,7 +1185,7 @@ float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
              mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
 float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
 float lumOf(vec3 c){return dot(c,vec3(.3,.59,.11));}
-float waterOf(vec3 c){float bw=smoothstep(-.005,.03,c.b-c.r)*smoothstep(-.10,-.03,c.b-c.g)*(1.-smoothstep(.45,.70,lumOf(c)));return smoothstep(.0,.30,bw);}
+float waterOf(vec3 c){return smoothstep(.01,.06,c.b-c.r)*smoothstep(-.04,.0,c.b-c.g)*(1.-smoothstep(.28,.5,lumOf(c)));}
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){
   vec2 uv=(gl_FragCoord.xy-.5*uRes)/(.5*uRes.y);
@@ -1216,7 +1216,7 @@ void main(){
   float ndv=max(dot(n,vv),0.);
   float diff=.46+.54*smoothstep(-.35,1.,dot(n,L));
 
-  float w=max(waterOf(dayT),waterOf(blurT)*.9);
+  float w=waterOf(dayT);
 
   /* land: deep, graded colour with relief shading taken from the imagery brightness */
   vec3 land=pow(dayT,vec3(1.22));
