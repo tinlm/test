@@ -431,7 +431,7 @@ async function loadMapStyle(){
 const map=new maplibregl.Map({
   container:'map',center:[DEFAULT_POS.lng,DEFAULT_POS.lat],zoom:17,minZoom:-2,maxZoom:19.5,
   style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#050608'}}]},
-  attributionControl:false,cancelPendingTileRequestsWhileZooming:false,maxTileCacheSize:600,dragRotate:false,pitchWithRotate:false,touchPitch:false
+  attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false
 });
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
@@ -450,27 +450,7 @@ function addRange(){
 }
 map.on('style.load',()=>{addRange();addQuestLayers();});
 let styleReady=false,STYLE_JSON='';
-/* warm the browser cache with the low-zoom world tiles so zooming out to space doesn't wait on the network */
-let warmDone=false,warmTpl=null;
-async function warmTiles(){
-  if(warmDone||!STYLE_JSON)return;warmDone=true;
-  try{
-    const st=JSON.parse(STYLE_JSON);
-    const src=Object.values(st.sources||{}).find(x=>x.type==='vector');
-    if(!src)return;
-    warmTpl=(src.tiles&&src.tiles[0])||(await (await fetch(src.url)).json()).tiles[0];
-    const list=[];
-    for(let z=0;z<=3;z++){const n=1<<z;for(let x=0;x<n;x++)for(let y=0;y<n;y++)list.push([z,x,y]);}
-    const lat=player.lat*Math.PI/180,Z=5,n=1<<Z;
-    const cx=Math.floor((player.lng+180)/360*n),cy=Math.floor((1-Math.log(Math.tan(lat)+1/Math.cos(lat))/Math.PI)/2*n);
-    for(let z=4;z<=6;z++){const k=z-Z,c=[Math.floor(cx*Math.pow(2,k)),Math.floor(cy*Math.pow(2,k))],r=z===4?3:2;
-      for(let dx=-r;dx<=r;dx++)for(let dy=-r;dy<=r;dy++){const m=1<<z;list.push([z,((c[0]+dx)%m+m)%m,Math.max(0,Math.min(m-1,c[1]+dy))]);}}
-    let i=0;
-    const worker=async()=>{while(i<list.length){const t=list[i++];try{await fetch(warmTpl.replace('{z}',t[0]).replace('{x}',t[1]).replace('{y}',t[2]));}catch(e){}}};
-    await Promise.all([worker(),worker(),worker(),worker()]);
-  }catch(e){warmDone=false;warmTpl=null;}
-}
-loadMapStyle().then(s=>{STYLE_JSON=JSON.stringify(s);map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;setTimeout(warmTiles,2500);});});
+loadMapStyle().then(s=>{STYLE_JSON=JSON.stringify(s);map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
 
 function mkMarker(html,lng,lat,onClick,z){
   const el=document.createElement('div');el.innerHTML=html;
@@ -1343,24 +1323,24 @@ function camBasis(lat,lon){
 }
 const hAtZoom=(z,lat)=>(6.2907*Math.cos(lat)/(512*Math.pow(2,z)))*innerHeight/(2*Math.tan(FOV/2));
 function earthDraw(){
-  const gl=E.gl,b=camBasis(E.latA+Math.sin(E.time*.31)*.012,E.lonA);
+  const gl=E.gl,b=camBasis(E.latA+Math.sin(E.time*.31)*.012*(E.wob??1),E.lonA);
   gl.useProgram(E.prog);
   gl.uniform2f(E.u.uRes,E.cv.width,E.cv.height);
   gl.uniform1f(E.u.uD,E.D);gl.uniform1f(E.u.uFov,FOV);gl.uniform1f(E.u.uT,E.time);
-  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012);
+  gl.uniform1f(E.u.uRoll,Math.sin(E.time*.17)*.012*(E.wob??1));
   gl.uniform3fv(E.u.uX,b.x);gl.uniform3fv(E.u.uY,b.y);gl.uniform3fv(E.u.uZ,b.z);
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,E.texDay);gl.uniform1i(E.u.uDay,0);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
 /* your position follows the planet; fades out when it turns behind the globe */
 function placeYou(){
-  const b=camBasis(E.latA+Math.sin(E.time*.31)*.012,E.lonA);
+  const b=camBasis(E.latA+Math.sin(E.time*.31)*.012*(E.wob??1),E.lonA);
   const la=player.lat*Math.PI/180,lo=player.lng*Math.PI/180;
   const P=[Math.cos(la)*Math.sin(lo),Math.sin(la),Math.cos(la)*Math.cos(lo)];
   const d=(a)=>P[0]*a[0]+P[1]*a[1]+P[2]*a[2];
   const nx=d(b.x),ny=d(b.y),nz=d(b.z);
   const vis=E.D*nz-1,tf=Math.tan(FOV/2),k=1/(E.D-nz)/tf;
-  const ux=nx*k,uy=ny*k,r=Math.sin(E.time*.17)*.012,cr=Math.cos(r),sr=Math.sin(r);
+  const ux=nx*k,uy=ny*k,r=Math.sin(E.time*.17)*.012*(E.wob??1),cr=Math.cos(r),sr=Math.sin(r);
   const sx=cr*ux-sr*uy,sy=sr*ux+cr*uy,H=innerHeight;
   youEl.style.transform='translate('+(innerWidth/2+sx*H/2)+'px,'+(H/2-sy*H/2)+'px)';
   const t=Math.max(0,Math.min(1,vis/.12));
@@ -1370,6 +1350,7 @@ const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
 function earthFrame(){
   if(!E.active)return;
   const now=performance.now()/1000,dt=Math.min(.05,now-E.last);E.last=now;E.time+=dt;
+  E.wob=E.state==='out'?Math.pow(1-Math.min(1,(now-E.ts)/3.8),3):1;
   let lnD,f;
   if(E.state==='in'){
     const p=Math.min(1,(now-E.ts)/4.6),e=1-Math.pow(1-p,3);
@@ -1383,8 +1364,9 @@ function earthFrame(){
   }else{
     const p=Math.min(1,(now-E.ts)/3.8),e=p*p*p;
     lnD=E.lnD0+(Math.log(E.Dh)-E.lnD0)*e;f=E.f0+(.55-E.f0)*e;
-    E.latA+=(E.lat0-E.latA)*(1-Math.exp(-dt*(1.5+5*e)));
-    E.lonA+=wrapA(E.lon0-E.lonA)*(1-Math.exp(-dt*(1.5+6*e)));
+    if(E.latS===undefined){E.latS=E.latA;E.lonD=wrapA(E.lonA-E.lon0);}
+    const q=Math.min(1,p/.75),sq=q*q*(3-2*q);
+    E.latA=E.lat0+(E.latS-E.lat0)*(1-sq);E.lonA=E.lon0+E.lonD*(1-sq);
     if(p>=1){earthStop();return;}
   }
   E.lnD=lnD;E.f=f;E.D=Math.exp(lnD);setTelem(f);
@@ -1432,7 +1414,7 @@ function startOrbit(){
   const token=++orbitToken;
   document.body.dataset.follow='0';
   document.body.classList.add('orbit');
-  hideLabels();ensureSat();warmTiles();
+  hideLabels();ensureSat();
   const pre=earthPrepare();           // downloads the planet imagery while the camera climbs
   setTelem(0);
   updateSat();
@@ -1477,7 +1459,7 @@ function endOrbit(){
   if(!orbit||returning)return;
   returning=true;
   if(E.active){            // fly the camera back down to the map
-    E.state='out';E.ts=performance.now()/1000;E.lnD0=E.lnD;E.f0=E.f;
+    E.state='out';E.latS=undefined;E.ts=performance.now()/1000;E.lnD0=E.lnD;E.f0=E.f;
     E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;E.drag=false;
     return;
   }
