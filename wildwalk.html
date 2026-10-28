@@ -39,7 +39,7 @@
   .c4{bottom:76px;right:10px;border-left:0;border-top:0}
 
   .nav{position:absolute;left:0;right:0;bottom:0;z-index:1000;display:flex;gap:8px;padding:10px 10px max(12px,env(safe-area-inset-bottom));pointer-events:none}
-  .nav button{pointer-events:auto;flex:1;background:#000d;color:var(--text);border:1px solid var(--hi);padding:14px 4px;font:500 11px var(--sans);letter-spacing:.14em;text-transform:uppercase;backdrop-filter:blur(6px)}
+  .nav button{pointer-events:auto;flex:1;background:#000d;color:var(--text);border:1px solid var(--hi);padding:14px 4px;font:500 12px var(--sans);letter-spacing:.22em;text-transform:uppercase;backdrop-filter:blur(6px)}
   .nav button.on{background:#fff;color:#000;border-color:#fff}
   .hint{position:absolute;left:10px;right:10px;bottom:70px;z-index:1000;text-align:center;font:400 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#fff;background:#000c;border:1px solid var(--line);padding:6px 10px;pointer-events:none;display:none}
 
@@ -132,86 +132,6 @@
   .cap{position:absolute;left:0;right:0;bottom:calc(var(--bar) + 30px + env(safe-area-inset-bottom,0px));text-align:center;font:500 13px var(--sans);letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#fff;opacity:0}
   body.spun .cap{animation:cap 6s ease 1}
   @keyframes cap{0%{opacity:0;transform:translateY(8px)}20%,70%{opacity:1;transform:none}100%{opacity:0}}
-
-  /* ===== Quests ===== */
-  .qsub{font:400 10px var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase;line-height:1.5}
-  .btn.sm{padding:12px 16px;font-size:11px;letter-spacing:.18em}
-  .xq{background:none;border:1px solid var(--hi);color:var(--text);width:36px;height:36px;font-size:18px;flex:none}
-  .qrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-
-  .qdr{position:absolute;inset:0;z-index:2500;background:#000;display:none;flex-direction:column}
-  .qdr.open{display:flex}
-  .qdh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:max(16px,env(safe-area-inset-top)) 16px 12px;border-bottom:1px solid var(--line)}
-  .qdh h1{font:500 20px var(--sans);letter-spacing:.24em;text-transform:uppercase}
-  .qdb{flex:1;overflow:auto;padding:14px 16px max(30px,env(safe-area-inset-bottom));-webkit-overflow-scrolling:touch}
-  .qh3{margin:24px 0 2px;font:400 10px var(--mono);letter-spacing:.28em;color:var(--muted);text-transform:uppercase}
-  .qbig{font:500 28px var(--sans);letter-spacing:.26em;text-transform:uppercase;margin-top:6px}
-  .qa{border:1px solid #fff;background:#07090c;padding:14px}
-  .qaT{font:500 17px var(--sans);letter-spacing:.1em;text-transform:uppercase;margin:6px 0}
-  .qc{border:1px solid var(--line);background:var(--panel);padding:14px;margin-top:10px}
-  .qch b{font:500 16px var(--sans);letter-spacing:.14em;text-transform:uppercase}
-  .tag{font:400 9px var(--mono);letter-spacing:.18em;color:var(--muted);white-space:nowrap}
-  .idx{font:500 12px var(--mono);letter-spacing:.1em;border:1px solid var(--hi);padding:5px 7px;flex:none}
-  .btn:disabled{opacity:.4}
-
-  .qi{width:100%;min-width:0;background:transparent;border:0;border-bottom:1px solid var(--hi);border-radius:0;color:var(--text);font:500 16px var(--sans);letter-spacing:.04em;padding:9px 2px;outline:none}
-  .qi:focus{border-bottom-color:#fff}
-  .qi::placeholder{color:#59626c}
-  .qi.name{font-size:20px;letter-spacing:.14em;text-transform:uppercase;padding:10px 2px}
-  .ql{border:1px solid var(--line);background:var(--panel);padding:12px;margin-top:10px}
-  .qlh{display:flex;align-items:center;gap:10px}
-  .mini{display:flex;gap:4px;flex:none}
-  .mini button,.qe button{background:transparent;border:1px solid var(--line);color:var(--text);width:34px;height:34px;font-size:15px;flex:none}
-  .mini button:disabled{opacity:.25}
-  .qe{display:flex;align-items:center;gap:8px;margin-top:8px}
-  .sq{width:14px;height:14px;border:1px solid var(--hi);flex:none}
-
-  .pickbar{position:absolute;left:10px;right:10px;bottom:70px;z-index:1100;display:none;align-items:center;gap:8px;background:#000e;border:1px solid #fff;padding:8px 10px}
-  .pickbar.on{display:flex}
-  .pickbar span{flex:1;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
-  .pickbar button{background:transparent;color:#fff;border:1px solid var(--hi);padding:11px 12px;font:500 11px var(--sans);letter-spacing:.18em;text-transform:uppercase}
-  .pickbar button.go{background:#fff;color:#000;border-color:#fff}
-
-  .qsheet{position:absolute;left:0;right:0;bottom:0;z-index:1800;background:#000;border-top:1px solid #fff;padding:16px 14px max(16px,env(safe-area-inset-bottom));max-height:68vh;overflow:auto;transform:translateY(105%);visibility:hidden;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s .3s}
-  .qsheet.open{transform:none;visibility:visible;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s}
-  .qsheet .xq{position:absolute;right:12px;top:12px}
-  .qsheet h2{font:500 20px var(--sans);letter-spacing:.16em;text-transform:uppercase;margin:6px 46px 4px 0}
-  .qt{display:flex;align-items:center;gap:14px;width:100%;text-align:left;background:#07090c;border:1px solid var(--line);color:var(--text);padding:15px 14px;margin-top:8px;font:500 15px var(--sans);letter-spacing:.05em;min-height:56px}
-  .qt .cb{width:24px;height:24px;border:1px solid #fff;display:grid;place-items:center;flex:none;font:600 15px var(--sans);color:#000}
-  .qt.d{border-color:#ffffff55}
-  .qt.d .cb{background:#fff}
-  .qt.d .tx{color:var(--muted);text-decoration:line-through}
-  body.orbit .pickbar,body.orbit .qsheet{opacity:0;pointer-events:none}
-
-  .qpin{position:relative;width:30px;height:30px;border-radius:50%;border:1px solid #fff;background:#000;display:grid;place-items:center;font:500 12px var(--mono);color:#fff;pointer-events:none}
-  .qpin.t{background:#fff;color:#000}
-  .qpin.t::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:50%;animation:ping 2s ease-out infinite}
-  .qpin.d{opacity:.45}
-  @media (prefers-reduced-motion:reduce){.qpin.t::after{animation:none!important}}
-
-  .rs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 6px}
-  .rs div{border:1px solid var(--line);padding:10px 2px;text-align:center}
-  .rs b{display:block;font:500 15px var(--mono);letter-spacing:.02em}
-  .rs span{display:block;font:400 8px var(--mono);letter-spacing:.16em;color:var(--muted);text-transform:uppercase;margin-top:4px}
-  .rl{border-top:1px solid var(--line);padding:12px 0 4px;margin-top:8px}
-  .rl.off{opacity:.5}
-  .rlh{display:flex;align-items:center;gap:10px}
-  .rlh b{flex:1;min-width:0;font:500 13px var(--sans);letter-spacing:.1em;text-transform:uppercase}
-  .rt{display:flex;align-items:center;gap:10px;margin-top:8px;font:400 14px var(--sans);letter-spacing:.03em}
-  .rt i{width:16px;height:16px;border:1px solid var(--hi);display:grid;place-items:center;font:600 11px var(--sans);font-style:normal;flex:none}
-  .rt.d i{background:#fff;color:#000;border-color:#fff}
-  .rt span{flex:1;min-width:0}
-  .rt em{font:400 10px var(--mono);font-style:normal;color:var(--muted)}
-  .run{border:1px solid var(--line);background:var(--panel);margin-top:8px}
-  .rh{display:block;width:100%;text-align:left;background:transparent;border:0;color:var(--text);padding:12px 14px}
-  .rt1{display:flex;justify-content:space-between;align-items:center;gap:10px}
-  .rt1 b{font:500 14px var(--sans);letter-spacing:.12em;text-transform:uppercase}
-  .qchip{font:500 9px var(--mono);letter-spacing:.18em;padding:3px 7px;border:1px solid var(--hi);white-space:nowrap}
-  .qchip.completed{background:#fff;color:#000;border-color:#fff}
-  .qchip.aborted{color:var(--muted);border-color:var(--line)}
-  .pb{height:2px;background:#ffffff26;margin-top:10px}
-  .pb i{display:block;height:100%;background:#fff}
-  .rbody{padding:0 14px 14px}
 </style>
 </head>
 <body>
@@ -224,7 +144,7 @@
   <div class="lbar lt"><span>Wildwalk</span><span>Orbital view</span></div>
   <div class="cap">Low Earth orbit</div>
   <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
-  <div class="credit">Map data © OpenStreetMap contributors · OpenFreeMap</div>
+  <div class="credit">Imagery © Esri</div>
 </div>
 
 <div class="hud"><div class="panel">
@@ -233,7 +153,7 @@
     <div class="bar"><i id="xpbar"></i></div>
     <div class="orbs" id="orbs">ORB 10</div>
   </div>
-  <div class="mh"><span id="mhl">Missions</span><span id="mode">LOCATING</span></div>
+  <div class="mh"><span>Missions</span><span id="mode">LOCATING</span></div>
   <div class="mq" id="mq"><span class="t" id="mt">Scanning for missions</span><span class="d" id="md"></span></div>
 </div></div>
 
@@ -241,30 +161,12 @@
 
 <div class="nav">
   <button id="bLoc">Locate</button>
-  <button id="bQuest">Quests</button>
   <button id="bDex">Dex</button>
   <button id="bOrbit">Orbit</button>
   <button id="bSim">Sim</button>
 </div>
 
 <div class="toast" id="toast"></div>
-
-<div class="pickbar" id="pickbar"><span id="pickTxt">Tap the map to add places</span><button id="pickUndo">Undo</button><button class="go" id="pickDone">Done</button></div>
-
-<div class="qsheet" id="qsheet">
-  <button class="xq" id="qsX" aria-label="Minimise">×</button>
-  <div class="qsub" id="qsE"></div>
-  <h2 id="qsT"></h2>
-  <div class="qsub" id="qsS"></div>
-  <div id="qsL"></div>
-  <div class="qrow"><button class="btn ghost sm" id="qsAbort">Abort quest</button></div>
-</div>
-
-<div class="qdr" id="qd">
-  <div class="qdh"><h1 id="qdT">Quests</h1><button class="xq" id="qdX" aria-label="Close">×</button></div>
-  <div class="qdb" id="qdB"></div>
-</div>
-
 
 <div class="modal" id="catch">
   <div class="info"><b id="cName"></b><div id="cSub"></div></div>
@@ -317,10 +219,9 @@ const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
 const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 
 /* ================= State ================= */
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,quests:[],runs:[],active:null};
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0};
 let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
 let SIM=false;   // not saved: every launch starts on real GPS
-let PICK=false,ED=null,QV={view:'list'};   // quest editor: picking places on the map / draft quest / drawer view
 const save=()=>localStorage.setItem(LS,JSON.stringify(S));
 const $=id=>document.getElementById(id);
 const level=x=>Math.floor(Math.sqrt(x/100))+1;
@@ -334,47 +235,12 @@ const hash=(a,b,c)=>{let h=2166136261;for(const v of [a,b,c]){h^=v;h=Math.imul(h
 let tTimer;function toast(h,ms=2200){const t=$('toast');t.innerHTML=h;t.classList.add('show');clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ms);}
 const vib=p=>navigator.vibrate&&navigator.vibrate(p);
 const fmtD=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(1)+' km';
-const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 /* ================= Map (vector tiles, sharp at any zoom) ================= */
 const STYLE_URLS=['https://tiles.openfreemap.org/styles/dark','https://tiles.openfreemap.org/styles/positron'];
 const FALLBACK_STYLE={version:8,sources:{esri:{type:'raster',tileSize:256,maxzoom:16,attribution:'Tiles © Esri',
   tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}']}},
   layers:[{id:'esri',type:'raster',source:'esri',paint:{'raster-brightness-max':.62,'raster-contrast':.5}}]};
-
-/* Roads shrink and fade out together (highways included) while you fly up, instead of vanishing at one zoom level. */
-const ROAD_Z=[10.5,12,13.5,15.5,17,19,22];
-const roadF=z=>z>=15.5?1:z<=10.5?.2:.2+.8*Math.pow((z-10.5)/5,1.15);
-const ROAD_OPACITY=['interpolate',['linear'],['zoom'],10.5,0,12,.3,13.5,.7,15,1];
-function widthStops(w){
-  if(typeof w==='number')return {base:1,stops:[[0,w],[24,w]]};
-  if(Array.isArray(w)&&w[0]==='interpolate'&&JSON.stringify(w[2])==='["zoom"]'){
-    const t=w[1],base=t[0]==='exponential'?t[1]:1,stops=[];
-    for(let i=3;i+1<w.length;i+=2){if(typeof w[i]!=='number'||typeof w[i+1]!=='number')return null;stops.push([w[i],w[i+1]]);}
-    return stops.length?{base,stops}:null;
-  }
-  if(w&&typeof w==='object'&&!Array.isArray(w)&&Array.isArray(w.stops)){
-    const stops=w.stops.filter(s=>typeof s[0]==='number'&&typeof s[1]==='number');
-    return stops.length&&stops.length===w.stops.length?{base:w.base||1,stops}:null;
-  }
-  return null;
-}
-function evalStops(ws,z){
-  const {base,stops}=ws;
-  if(z<=stops[0][0])return stops[0][1];
-  const last=stops[stops.length-1];if(z>=last[0])return last[1];
-  for(let i=0;i<stops.length-1;i++){
-    const [z0,v0]=stops[i],[z1,v1]=stops[i+1];
-    if(z>=z0&&z<=z1){const t=base===1?(z-z0)/(z1-z0):(Math.pow(base,z-z0)-1)/(Math.pow(base,z1-z0)-1);return v0+(v1-v0)*t;}
-  }
-  return last[1];
-}
-function fadeWidth(w){
-  const ws=widthStops(w);if(!ws)return w;
-  const out=['interpolate',['linear'],['zoom']];
-  ROAD_Z.forEach(z=>out.push(z,Math.max(.15,evalStops(ws,z)*roadF(z))));
-  return out;
-}
 
 /* Recolor any OpenMapTiles-based style into the black / white hairline look. */
 function themeStyle(s){
@@ -394,14 +260,10 @@ function themeStyle(s){
       case 'fill-extrusion': l.paint['fill-extrusion-color']='#0d1015';delete l.paint['fill-extrusion-pattern'];break;
       case 'line':
         delete l.paint['line-pattern'];
+        if(l['source-layer']==='transportation')l.minzoom=13;
         if(has(id,'casing','outline','bridge_casing')){hide();break;}
         if(has(id,'boundary','admin')){l.paint['line-color']='#262d36';break;}
-        if(l['source-layer']==='transportation'){
-          l.paint['line-color']=['match',['get','class'],['path','pedestrian','steps','footway','cycleway'],'#2d343c',['rail','transit'],'#2a3038','#6f7984'];
-          delete l.minzoom;
-          l.paint['line-opacity']=ROAD_OPACITY;
-          l.paint['line-width']=fadeWidth(l.paint['line-width']);
-        }
+        if(l['source-layer']==='transportation')l.paint['line-color']=['match',['get','class'],['path','pedestrian','steps','footway','cycleway'],'#2d343c',['rail','transit'],'#2a3038','#6f7984'];
         else if(has(id,'water'))l.paint['line-color']='#0c1218';
         else if(has(id,'motorway','trunk','primary','secondary','tertiary','minor','service','street','track','residential','road'))l.paint['line-color']='#6f7984';
         else if(has(id,'path','pedestrian','footway','steps','cycle'))l.paint['line-color']='#2d343c';
@@ -446,9 +308,9 @@ function addRange(){
   map.addSource('range',{type:'geojson',data:circleLine(player,CATCH_RANGE)});
   map.addLayer({id:'range',type:'line',source:'range',paint:{'line-color':'#ffffff','line-width':1,'line-dasharray':[2,3],'line-opacity':.85}});
 }
-map.on('style.load',()=>{addRange();addQuestLayers();});
-let styleReady=false,STYLE_JSON='';
-loadMapStyle().then(s=>{STYLE_JSON=JSON.stringify(s);map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
+map.on('style.load',addRange);
+let styleReady=false;
+loadMapStyle().then(s=>{map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
 
 function mkMarker(html,lng,lat,onClick,z){
   const el=document.createElement('div');el.innerHTML=html;
@@ -458,16 +320,17 @@ function mkMarker(html,lng,lat,onClick,z){
   return {mk,el};
 }
 const me=mkMarker('<div class="me"></div>',player.lng,player.lat,null,10);
+me.el.classList.add('keep');
 
-function setReadout(){$('mode').textContent=S.active?fmtT(Date.now()-S.active.startedAt)+(SIM?' · SIM':''):(SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING'));}
+function setReadout(){$('mode').textContent=SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING');}
 function setPlayer(lat,lng,pan){
   player={lat,lng};
   me.mk.setLngLat([lng,lat]);
   const src=map.getSource('range');if(src)src.setData(circleLine(player,CATCH_RANGE));
   if(pan)map.easeTo({center:[lng,lat],duration:600});
-  setReadout();refresh();maybeFetchStops();ensureMission();questTick();renderMission();
+  setReadout();refresh();maybeFetchStops();ensureMission();renderMission();
 }
-map.on('click',e=>{if(PICK){addPick(e.lngLat.lat,e.lngLat.lng);return;}if(SIM)setPlayer(e.lngLat.lat,e.lngLat.lng,false);});
+map.on('click',e=>{if(SIM)setPlayer(e.lngLat.lat,e.lngLat.lng,false);});
 map.on('dragstart',()=>document.body.dataset.follow='0');
 
 /* ================= Location (asks on load) ================= */
@@ -544,7 +407,6 @@ function refresh(){
   refreshStops();
 }
 function tapSpawn(s){
-  if(PICK)return;
   const d=dist(player,s);
   if(d>CATCH_RANGE){toast(`${s.sp.n}<small>${Math.round(d)} m away · get within ${CATCH_RANGE} m</small>`);return;}
   openCatch(s);
@@ -670,19 +532,18 @@ function refreshStops(){
   }
 }
 function tapStop(s){
-  if(PICK){addPick(s.lat,s.lng,s.supply?null:s.name);return;}
   const d=dist(player,s);
-  if(d>STOP_RANGE){toast(`${esc(s.name)}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
+  if(d>STOP_RANGE){toast(`${s.name}<small>${Math.round(d)} m away · get within ${STOP_RANGE} m</small>`);return;}
   if(!s.supply){
     const left=STOP_COOLDOWN-(Date.now()-(S.stopCd[s.id]||0));
-    if(left>0){toast(`${esc(s.name)}<small>Recharging · ${Math.ceil(left/60000)} min</small>`);return;}
+    if(left>0){toast(`${s.name}<small>Recharging · ${Math.ceil(left/60000)} min</small>`);return;}
   }
   const lv=level(S.xp),n=3+Math.floor(Math.random()*3)+Math.floor(lv/5),xp=s.supply?20:25;
   S.orbs+=n;S.xp+=xp;
   if(s.supply)S.gone[s.id]=Date.now();else S.stopCd[s.id]=Date.now();
   save();vib(60);
   const note=missionEvent('visit',{id:s.id});
-  toast(`${esc(s.name)}<small>+${n} orbs · +${xp} XP${note?' · '+note:''}</small>`,3000);
+  toast(`${s.name}<small>+${n} orbs · +${xp} XP${note?' · '+note:''}</small>`,3000);
   updateHud();refreshStops();
 }
 
@@ -710,7 +571,7 @@ function ensureMission(){
   if(S.mission&&S.mission.type==='visit'&&dist(player,S.mission)>2500)S.mission=null;
   if(!S.mission){
     if(mType(S.mIdx)==='visit'&&!stopsReady)return;
-    S.mission=newMission();save();refreshStops();renderMission();
+    S.mission=newMission();save();refreshStops();
   }
 }
 function missionEvent(kind,data){
@@ -728,8 +589,6 @@ function missionEvent(kind,data){
   save();renderMission();return '';
 }
 function renderMission(){
-  if(S.active){questLine();return;}
-  $('mhl').textContent='Missions';
   const m=S.mission,t=$('mt'),d=$('md');
   if(!m){t.textContent='Scanning for missions';d.textContent='';return;}
   if(m.type==='visit'){
@@ -739,7 +598,6 @@ function renderMission(){
   else{t.textContent='Capture 1 uncommon or better';d.textContent=`${m.have}/${m.need}`;}
 }
 $('mq').onclick=()=>{
-  if(S.active){if(S.active.phase==='tasks')openSheet();else focusTarget();return;}
   const m=S.mission;
   if(m&&m.type==='visit'){document.body.dataset.follow='0';map.easeTo({center:[m.lng,m.lat],duration:700});}
 };
@@ -761,375 +619,20 @@ function renderDex(){
 }
 $('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
 $('dexX').onclick=()=>$('dex').classList.remove('open');
-$('reset').onclick=()=>{if(confirm('Reset all progress?\nYour saved quests are kept. Session history is cleared.')){localStorage.setItem(LS,JSON.stringify({quests:S.quests}));location.reload();}};
+$('reset').onclick=()=>{if(confirm('Reset all progress?')){localStorage.removeItem(LS);location.reload();}};
 $('bLoc').onclick=()=>{document.body.dataset.follow='1';map.easeTo({center:[player.lng,player.lat],zoom:Math.max(map.getZoom(),17),duration:600});};
 
 function setSim(on){
-  if(!on&&ED){
-    if(edDirty()&&!confirm('Discard unsaved quest changes?'))return;
-    dropEditor();
-  }
   SIM=on;
-  if(on&&S.active)S.active.sim=true;
-  $('bSim').classList.toggle('on',on);syncHint();
+  $('bSim').classList.toggle('on',on);$('hint').style.display=on?'block':'none';
   $('simSw').classList.toggle('on',on);setReadout();
   if(!on&&!gotFix)startGPS();
-  if($('qd').classList.contains('open'))renderQD();
 }
 $('bSim').onclick=()=>setSim(!SIM);
 $('simSw').onclick=()=>setSim(!SIM);
 
-/* ================= Quests: editor (Sim mode) and runner ================= */
-const QUEST_RANGE=60;
-const fmtT=ms=>{const t=Math.max(0,Math.round(ms/1000)),h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60,p=n=>String(n).padStart(2,'0');return h?`${h}:${p(m)}:${p(s)}`:`${p(m)}:${p(s)}`;};
-const fmtDT=ts=>new Date(ts).toLocaleString([],{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-const fmtClock=ts=>new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-const qid=()=>'q'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const clone=o=>JSON.parse(JSON.stringify(o));
-const questTaskCount=q=>q.locs.reduce((n,l)=>n+l.tasks.length,0);
-const routeLen=q=>q.locs.reduce((m,l,i)=>i?m+dist(q.locs[i-1],l):0,0);
-function runStats(r){
-  const tasks=r.locs.reduce((n,l)=>n+l.tasks.length,0);
-  const done=r.locs.reduce((n,l)=>n+l.tasks.filter(t=>t.doneAt).length,0);
-  const locsDone=r.locs.filter(l=>l.completedAt).length;
-  const pct=tasks?Math.round(done/tasks*100):(r.locs.length?Math.round(locsDone/r.locs.length*100):0);
-  return {tasks,done,locsDone,locs:r.locs.length,pct,dur:(r.endedAt||Date.now())-r.startedAt};
-}
-
-let lastPt=null,tickN=0;
-let qMarkers=[];
-const openRuns=new Set();
-const EMPTY={type:'FeatureCollection',features:[]};
-let qLineGJ=EMPTY,qGuideGJ=EMPTY;
-
-/* --- map layers: quest route (editor) and guide line (player to next location) --- */
-function addQuestLayers(){
-  if(!map.getSource('qline')){
-    map.addSource('qline',{type:'geojson',data:qLineGJ});
-    map.addLayer({id:'qline',type:'line',source:'qline',paint:{'line-color':'#ffffff','line-width':1.5,'line-dasharray':[1,2],'line-opacity':.8}});
-  }
-  if(!map.getSource('qguide')){
-    map.addSource('qguide',{type:'geojson',data:qGuideGJ});
-    map.addLayer({id:'qguide',type:'line',source:'qguide',paint:{'line-color':'#ffffff','line-width':2,'line-dasharray':[2,2],'line-opacity':.95}});
-  }
-}
-function setLine(name,coords){
-  const gj=coords.length>1?{type:'Feature',geometry:{type:'LineString',coordinates:coords}}:EMPTY;
-  if(name==='qline')qLineGJ=gj;else qGuideGJ=gj;
-  const s=map.getSource(name);if(s)s.setData(gj);
-}
-function updateGuide(){
-  const R=S.active;
-  if(R&&!ED&&R.phase==='travel'){const l=R.locs[R.idx];setLine('qguide',[[player.lng,player.lat],[l.lng,l.lat]]);}
-  else setLine('qguide',[]);
-}
-function drawQuestMarkers(){
-  qMarkers.forEach(m=>m.mk.remove());qMarkers=[];
-  const add=(cls,txt,l)=>qMarkers.push(mkMarker(`<div class="qpin ${cls}">${txt}</div>`,l.lng,l.lat,null,5));
-  if(ED){
-    ED.q.locs.forEach((l,i)=>add('',i+1,l));
-    setLine('qline',ED.q.locs.map(l=>[l.lng,l.lat]));
-    setLine('qguide',[]);
-    return;
-  }
-  setLine('qline',[]);
-  const R=S.active;
-  if(R)R.locs.forEach((l,i)=>{if(i<R.idx)add('d','✓',l);else if(i===R.idx)add('t',i+1,l);});   // later locations stay hidden
-  updateGuide();
-}
-function focusTarget(){
-  const R=S.active;if(!R||R.phase!=='travel')return;
-  const l=R.locs[R.idx];document.body.dataset.follow='0';
-  const b=new maplibregl.LngLatBounds([player.lng,player.lat],[player.lng,player.lat]).extend([l.lng,l.lat]);
-  map.fitBounds(b,{padding:{top:170,bottom:120,left:50,right:50},maxZoom:17,duration:1200});
-}
-
-/* --- runner --- */
-function startQuest(id){
-  if(S.active){toast('Quest in progress<small>Finish or abort it first</small>');return;}
-  const q=S.quests.find(x=>x.id===id);
-  if(!q||!q.locs.length){toast('This quest has no locations');return;}
-  if(!gotFix&&!SIM){toast('Waiting for GPS<small>Enable location or use Sim mode</small>');return;}
-  S.active={id:'r'+Date.now().toString(36),questId:q.id,name:q.name,startedAt:Date.now(),endedAt:null,seen:Date.now(),status:'active',
-    sim:SIM,walked:0,idx:0,phase:'travel',
-    locs:q.locs.map(l=>({name:l.name,lat:l.lat,lng:l.lng,arrivedAt:null,completedAt:null,tasks:l.tasks.map(t=>({text:t.text,doneAt:null}))}))};
-  lastPt={...player};
-  save();$('qd').classList.remove('open');
-  onQuestChange();focusTarget();vib([40,50,80]);
-  toast(`Quest started<small>${esc(q.name)} · ${q.locs.length} locations</small>`,3000);
-}
-function onQuestChange(){
-  drawQuestMarkers();renderMission();setReadout();
-  $('bQuest').classList.toggle('on',!!S.active);
-  if($('qd').classList.contains('open')&&QV.view==='list')renderQD();
-}
-function questTick(){
-  const R=S.active;if(!R)return;
-  if(SIM||!lastPt)lastPt={...player};
-  else{const d=dist(lastPt,player);if(d>=6){if(d<250)R.walked+=d;lastPt={...player};}}   // GPS-walked distance, jitter filtered
-  updateGuide();
-  if(R.phase==='travel'&&(gotFix||SIM)&&dist(player,R.locs[R.idx])<=QUEST_RANGE)arriveAt(R);
-  renderMission();
-}
-function arriveAt(R){
-  const l=R.locs[R.idx];
-  l.arrivedAt=Date.now();R.phase='tasks';save();vib([60,40,60,40,120]);
-  if(!l.tasks.length){completeLoc(R);return;}
-  setLine('qguide',[]);
-  toast(`Arrived<small>${esc(l.name)}</small>`,2200);
-  drawQuestMarkers();renderMission();openSheet();
-}
-function completeLoc(R){
-  const l=R.locs[R.idx];l.completedAt=Date.now();
-  if(R.idx>=R.locs.length-1){finishQuest(R);return;}
-  R.idx++;R.phase='travel';save();closeSheet();
-  toast(`Location complete<small>Next: ${esc(R.locs[R.idx].name)}</small>`,3200);
-  onQuestChange();focusTarget();
-}
-function finishQuest(R){
-  R.endedAt=Date.now();R.status='completed';
-  const st=runStats(R);R.xp=R.locs.length*40+st.tasks*10;
-  const old=level(S.xp);S.xp+=R.xp;R.levelUp=level(S.xp)>old;
-  S.runs.unshift(R);if(S.runs.length>300)S.runs.length=300;
-  S.active=null;lastPt=null;save();updateHud();closeSheet();onQuestChange();
-  vib([80,60,80,60,200]);
-  QV={view:'done',runId:R.id};renderQD();$('qd').classList.add('open');
-}
-function abortQuest(reason){
-  const R=S.active;if(!R)return;
-  R.endedAt=reason==='closed'?(R.seen||Date.now()):Date.now();R.status='aborted';R.reason=reason;
-  S.runs.unshift(R);if(S.runs.length>300)S.runs.length=300;
-  S.active=null;lastPt=null;save();
-}
-function abortQuestUI(){
-  if(!S.active)return;
-  if(!confirm('Abort this quest?\nProgress is lost and the next attempt starts from the first location.'))return;
-  abortQuest('user');closeSheet();onQuestChange();toast('Quest aborted');
-}
-function questLine(){
-  const R=S.active,l=R.locs[R.idx];
-  $('mhl').textContent=`Quest · ${R.idx+1}/${R.locs.length}`;
-  if(R.phase==='travel'){$('mt').textContent='Travel to '+l.name;$('md').textContent=fmtD(dist(player,l));}
-  else{$('mt').textContent='Tasks at '+l.name;$('md').textContent=l.tasks.filter(t=>t.doneAt).length+'/'+l.tasks.length;}
-}
-
-/* --- task checklist sheet (shown on arrival) --- */
-function renderSheet(){
-  const R=S.active;if(!R||R.phase!=='tasks')return;
-  const l=R.locs[R.idx],d=l.tasks.filter(t=>t.doneAt).length;
-  $('qsE').textContent=`${R.name} · location ${R.idx+1}/${R.locs.length}`;
-  $('qsT').textContent=l.name;
-  $('qsS').textContent=`Arrived ${fmtClock(l.arrivedAt)} · ${d}/${l.tasks.length} done`;
-  $('qsL').innerHTML=l.tasks.map((t,i)=>`<button class="qt${t.doneAt?' d':''}" data-i="${i}"><span class="cb">${t.doneAt?'✓':''}</span><span class="tx">${esc(t.text)}</span></button>`).join('');
-}
-function openSheet(){const R=S.active;if(!R||R.phase!=='tasks')return;renderSheet();$('qsheet').classList.add('open');}
-function closeSheet(){$('qsheet').classList.remove('open');}
-function toggleTask(i){
-  const R=S.active;if(!R||R.phase!=='tasks')return;
-  const l=R.locs[R.idx],t=l.tasks[i];if(!t)return;
-  t.doneAt=t.doneAt?null:Date.now();
-  vib(20);save();renderSheet();renderMission();
-  if(l.tasks.every(x=>x.doneAt)){
-    setTimeout(()=>{if(S.active===R&&R.phase==='tasks'&&R.locs[R.idx]===l&&l.tasks.every(x=>x.doneAt))completeLoc(R);},600);
-  }
-}
-$('qsL').addEventListener('click',e=>{const b=e.target.closest('.qt');if(b)toggleTask(+b.dataset.i);});
-$('qsX').onclick=closeSheet;
-$('qsAbort').onclick=abortQuestUI;
-
-/* --- editor: pick locations on the map (Sim mode) --- */
-function syncHint(){$('hint').style.display=(SIM&&!PICK)?'block':'none';}
-function updatePickBar(){const n=ED?ED.q.locs.length:0;$('pickTxt').textContent=`${n} added · tap the map or a place`;}
-function enterPick(){
-  PICK=true;QV={view:'edit'};$('qd').classList.remove('open');closeSheet();
-  $('pickbar').classList.add('on');syncHint();updatePickBar();document.body.dataset.follow='0';
-  if(ED.q.locs.length){
-    const b=new maplibregl.LngLatBounds();ED.q.locs.forEach(l=>b.extend([l.lng,l.lat]));
-    map.fitBounds(b,{padding:{top:170,bottom:130,left:50,right:50},maxZoom:17,duration:800});
-  }
-}
-function exitPick(openDrawer){
-  PICK=false;$('pickbar').classList.remove('on');syncHint();
-  if(openDrawer!==false){renderQD();$('qd').classList.add('open');}
-}
-function addPick(lat,lng,name){
-  if(!ED)return;
-  const pt={lat,lng};
-  if(ED.q.locs.some(l=>dist(l,pt)<15)){toast('Already added');return;}
-  if(!name||name==='Landmark'){   // snap to a known named place within 35 m
-    const hit=stops.map(s=>({s,d:dist(s,pt)})).filter(o=>o.d<35&&o.s.name!=='Landmark').sort((a,b)=>a.d-b.d)[0];
-    if(hit){name=hit.s.name;pt.lat=hit.s.lat;pt.lng=hit.s.lng;}
-  }
-  ED.q.locs.push({id:qid(),name:name||('Location '+(ED.q.locs.length+1)),lat:pt.lat,lng:pt.lng,tasks:[]});
-  drawQuestMarkers();updatePickBar();vib(25);
-}
-$('pickUndo').onclick=()=>{if(ED&&ED.q.locs.length){ED.q.locs.pop();drawQuestMarkers();updatePickBar();}};
-$('pickDone').onclick=()=>exitPick();
-function dropEditor(){
-  PICK=false;$('pickbar').classList.remove('on');syncHint();
-  ED=null;QV={view:'list'};drawQuestMarkers();
-}
-const edDirty=()=>!!ED&&JSON.stringify(ED.q)!==ED.snap;
-function openEditor(q,isNew){
-  ED={q,isNew};ED.snap=JSON.stringify(q);QV={view:'edit'};drawQuestMarkers();renderQD();
-}
-
-/* --- quests drawer --- */
-function questStats(q){
-  const runs=S.runs.filter(r=>r.questId===q.id),done=runs.filter(r=>r.status==='completed');
-  return {runs:runs.length,done:done.length,best:done.length?Math.min(...done.map(r=>r.endedAt-r.startedAt)):null};
-}
-function runDetailHTML(r){
-  const st=runStats(r);
-  let h=`<div class="qsub" style="margin-top:10px">${r.status==='completed'?'Finished':'Ended'} ${fmtClock(r.endedAt)}${r.reason?' · '+(r.reason==='closed'?'app was closed':'aborted by you'):''}</div>`;
-  h+=`<div class="rs"><div><b>${fmtT(st.dur)}</b><span>Time</span></div><div><b>${st.locsDone}/${st.locs}</b><span>Places</span></div><div><b>${st.done}/${st.tasks}</b><span>Tasks</span></div><div><b>${r.walked?fmtD(r.walked):'—'}</b><span>Walked</span></div></div>`;
-  let prev=r.startedAt;
-  r.locs.forEach((l,i)=>{
-    const a=l.arrivedAt,c=l.completedAt;
-    h+=`<div class="rl${a?'':' off'}"><div class="rlh"><span class="idx">${String(i+1).padStart(2,'0')}</span><b>${esc(l.name)}</b><span class="tag">${c?'DONE':a?'PARTIAL':'NOT REACHED'}</span></div>`;
-    h+=`<div class="qsub" style="margin-top:6px">${a?`Travel ${fmtT(a-prev)} · on site ${c?fmtT(c-a):'—'} · arrived ${fmtClock(a)}`:'Not reached'}</div>`;
-    l.tasks.forEach(t=>{h+=`<div class="rt${t.doneAt?' d':''}"><i>${t.doneAt?'✓':''}</i><span>${esc(t.text)}</span><em>${t.doneAt&&a?'+'+fmtT(t.doneAt-a):''}</em></div>`;});
-    h+='</div>';
-    if(c)prev=c;
-  });
-  return h;
-}
-function runItemHTML(r){
-  const st=runStats(r),open=openRuns.has(r.id);
-  return `<div class="run"><button class="rh" data-act="run" data-id="${r.id}">
-    <div class="rt1"><b>${esc(r.name)}</b><span class="qchip ${r.status}">${r.status==='completed'?'COMPLETED':'ABORTED'}</span></div>
-    <div class="qsub" style="margin-top:6px">${fmtDT(r.startedAt)} · ${fmtT(st.dur)}${r.sim?' · sim':''}</div>
-    <div class="qsub">${st.locsDone}/${st.locs} places · ${st.done}/${st.tasks} tasks · ${st.pct}%</div>
-    <div class="pb"><i style="width:${st.pct}%"></i></div></button>
-    ${open?`<div class="rbody">${runDetailHTML(r)}<div class="qrow"><button class="btn ghost sm" data-act="delrun" data-id="${r.id}">Delete session</button></div></div>`:''}</div>`;
-}
-function listHTML(){
-  const R=S.active;let h='';
-  if(R){
-    const st=runStats(R),l=R.locs[R.idx];
-    h+=`<div class="qa"><div class="qsub">Active quest · ${esc(R.name)}</div>
-      <div class="qaT">${R.phase==='travel'?'Travel to ':'Tasks at '}${esc(l.name)}</div>
-      <div class="qsub">Place ${R.idx+1}/${R.locs.length} · ${st.done}/${st.tasks} tasks · ${fmtT(st.dur)}</div>
-      <div class="qrow"><button class="btn sm" data-act="${R.phase==='tasks'?'sheet':'focus'}">${R.phase==='tasks'?'Open checklist':'Show on map'}</button><button class="btn ghost sm" data-act="abort">Abort quest</button></div></div>`;
-  }
-  if(SIM)h+=`<div class="qrow"><button class="btn sm" data-act="new" style="flex:1">+ New quest</button></div>`;
-  h+=`<div class="qh3">Quests</div>`;
-  if(!S.quests.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No quests yet. Tap New quest to build one.':'No quests yet. Turn on Sim to create one.'}</div>`;
-  S.quests.forEach(q=>{
-    const st=questStats(q);
-    h+=`<div class="qc"><div class="qch"><b>${esc(q.name)}</b></div>
-      <div class="qsub" style="margin-top:6px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>
-      <div class="qsub">${st.runs?`Runs ${st.runs} · completed ${st.done}${st.best!=null?' · best '+fmtT(st.best):''}`:'Not run yet'}</div>
-      <div class="qrow"><button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button>${SIM?`<button class="btn ghost sm" data-act="edit" data-id="${q.id}">Edit</button>`:''}</div></div>`;
-  });
-  h+=`<div class="qh3">Sessions</div>`;
-  if(!S.runs.length)h+=`<div class="qsub" style="margin-top:8px">Every quest you start is logged here.</div>`;
-  S.runs.forEach(r=>{h+=runItemHTML(r);});
-  if(S.quests.length||S.runs.length)h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="export">Export data (JSON)</button></div>`;
-  return h;
-}
-function editHTML(){
-  const q=ED.q;
-  let h=`<input class="qi name" id="edName" placeholder="Quest name" maxlength="60" value="${esc(q.name)}">`;
-  h+=`<div class="qsub" style="margin-top:8px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>`;
-  q.locs.forEach((l,i)=>{
-    h+=`<div class="ql"><div class="qlh"><span class="idx">${String(i+1).padStart(2,'0')}</span>
-      <input class="qi" data-f="lname" data-i="${i}" maxlength="60" placeholder="Place name" value="${esc(l.name)}">
-      <div class="mini"><button data-act="up" data-i="${i}"${i?'':' disabled'}>↑</button><button data-act="down" data-i="${i}"${i<q.locs.length-1?'':' disabled'}>↓</button><button data-act="del" data-i="${i}">×</button></div></div>`;
-    if(i)h+=`<div class="qsub" style="margin-top:6px">${fmtD(dist(q.locs[i-1],l))} from previous</div>`;
-    l.tasks.forEach((t,j)=>{
-      h+=`<div class="qe"><i class="sq"></i><input class="qi" data-f="task" data-i="${i}" data-j="${j}" maxlength="120" placeholder="Task, e.g. take a photo" value="${esc(t.text)}"><button data-act="deltask" data-i="${i}" data-j="${j}">×</button></div>`;
-    });
-    h+=`<div class="qrow"><button class="btn ghost sm" data-act="addtask" data-i="${i}">+ Add task</button></div></div>`;
-  });
-  h+=`<div class="qrow"><button class="btn${q.locs.length?' ghost':''} sm" data-act="pick" style="flex:1">+ Add places on map</button></div>`;
-  h+=`<div class="qrow"><button class="btn" data-act="save" style="flex:1">Save quest</button>${ED.isNew?'':'<button class="btn ghost sm" data-act="delq">Delete</button>'}</div>`;
-  return h;
-}
-function doneHTML(){
-  const r=S.runs.find(x=>x.id===QV.runId);if(!r)return listHTML();
-  return `<div class="qsub">${esc(r.name)}</div><div class="qbig">Complete</div>
-    <div class="qsub" style="margin-top:6px">+${r.xp} XP${r.levelUp?' · level up':''}</div>
-    ${runDetailHTML(r)}<div class="qrow"><button class="btn" data-act="list" style="flex:1">Done</button></div>`;
-}
-function renderQD(){
-  if(QV.view==='edit'&&!ED)QV={view:'list'};
-  if(QV.view==='done'&&!S.runs.find(x=>x.id===QV.runId))QV={view:'list'};
-  const changed=renderQD.last!==QV.view;renderQD.last=QV.view;
-  $('qdT').textContent=QV.view==='edit'?(ED.isNew?'New quest':'Edit quest'):QV.view==='done'?'Quest complete':'Quests';
-  $('qdB').innerHTML=QV.view==='edit'?editHTML():QV.view==='done'?doneHTML():listHTML();
-  if(changed)$('qdB').scrollTop=0;
-  if(QV.focus){
-    const [a,b]=QV.focus.split(':'),el=$('qdB').querySelector(`[data-f="task"][data-i="${a}"][data-j="${b}"]`);
-    if(el)el.focus();
-    delete QV.focus;
-  }
-}
-function openQuestDrawer(){renderQD();$('qd').classList.add('open');}
-$('bQuest').onclick=()=>{if(PICK)exitPick(false);openQuestDrawer();};
-$('qdX').onclick=()=>{
-  if(QV.view==='edit'){
-    if(edDirty()&&!confirm('Discard unsaved changes?'))return;
-    dropEditor();renderQD();return;
-  }
-  $('qd').classList.remove('open');
-  if(QV.view==='done')QV={view:'list'};
-};
-$('qdB').addEventListener('input',e=>{
-  const t=e.target;if(!ED)return;
-  if(t.id==='edName')ED.q.name=t.value;
-  else if(t.dataset.f==='lname')ED.q.locs[+t.dataset.i].name=t.value;
-  else if(t.dataset.f==='task')ED.q.locs[+t.dataset.i].tasks[+t.dataset.j].text=t.value;
-});
-$('qdB').addEventListener('click',e=>{
-  const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
-  const a=b.dataset.act,i=+b.dataset.i,j=+b.dataset.j,id=b.dataset.id;
-  const redraw=()=>{drawQuestMarkers();renderQD();};
-  switch(a){
-    case 'new':if(SIM)openEditor({id:qid(),name:'',createdAt:Date.now(),locs:[]},true);break;
-    case 'edit':{const q=S.quests.find(x=>x.id===id);if(SIM&&q)openEditor(clone(q),false);break;}
-    case 'start':startQuest(id);break;
-    case 'focus':$('qd').classList.remove('open');focusTarget();break;
-    case 'sheet':$('qd').classList.remove('open');openSheet();break;
-    case 'abort':abortQuestUI();break;
-    case 'run':if(openRuns.has(id))openRuns.delete(id);else openRuns.add(id);renderQD();break;
-    case 'delrun':if(confirm('Delete this session from your history?')){S.runs=S.runs.filter(r=>r.id!==id);openRuns.delete(id);save();renderQD();}break;
-    case 'list':QV={view:'list'};renderQD();break;
-    case 'export':{
-      const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),quests:S.quests,sessions:S.runs},null,2)],{type:'application/json'});
-      const el=document.createElement('a');el.href=URL.createObjectURL(blob);el.download='wildwalk-quests.json';
-      document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(el.href),4000);break;
-    }
-    /* editor actions */
-    case 'up':if(ED&&i>0){const L=ED.q.locs;[L[i-1],L[i]]=[L[i],L[i-1]];redraw();}break;
-    case 'down':if(ED&&i<ED.q.locs.length-1){const L=ED.q.locs;[L[i+1],L[i]]=[L[i],L[i+1]];redraw();}break;
-    case 'del':if(ED){ED.q.locs.splice(i,1);redraw();}break;
-    case 'addtask':if(ED){const L=ED.q.locs[i];L.tasks.push({id:qid(),text:''});QV.focus=i+':'+(L.tasks.length-1);renderQD();}break;
-    case 'deltask':if(ED){ED.q.locs[i].tasks.splice(j,1);renderQD();}break;
-    case 'pick':if(ED)enterPick();break;
-    case 'save':saveQuest();break;
-    case 'delq':
-      if(ED&&confirm(`Delete "${ED.q.name||'this quest'}"? Past sessions are kept.`)){
-        S.quests=S.quests.filter(x=>x.id!==ED.q.id);save();dropEditor();renderQD();toast('Quest deleted');
-      }
-      break;
-  }
-});
-function saveQuest(){
-  if(!ED)return;
-  const q=ED.q;q.name=(q.name||'').trim();
-  if(!q.name){toast('Name your quest');const n=$('edName');if(n)n.focus();return;}
-  if(!q.locs.length){toast('Add at least one place');return;}
-  q.locs.forEach((l,k)=>{l.name=(l.name||'').trim()||('Place '+(k+1));l.tasks=l.tasks.map(t=>({...t,text:(t.text||'').trim()})).filter(t=>t.text);});
-  q.updatedAt=Date.now();
-  const k=S.quests.findIndex(x=>x.id===q.id);
-  if(k>=0)S.quests[k]=q;else S.quests.push(q);
-  save();dropEditor();renderQD();
-  toast(`Quest saved<small>${esc(q.name)} · ${q.locs.length} places · ${questTaskCount(q)} tasks</small>`,2600);
-}
-
 /* ================= Orbit cinematic: map to space ================= */
-const ZH=3.6, FOV=30*Math.PI/180;
+const ZH=3.6, FOV=30*Math.PI/180, SUN=(()=>{const v=[-.62,.30,.72],l=Math.hypot(...v);return v.map(x=>x/l);})();
 let orbit=false,returning=false,fallbackGlobe=false,spinRAF=null,dragging=false,orbitToken=0,hiddenLabels=[];
 
 /* --- labels: hidden for the whole flight --- */
@@ -1141,6 +644,17 @@ function hideLabels(){
 }
 function showLabels(){hiddenLabels.forEach(id=>{if(map.getLayer(id))map.setLayoutProperty(id,'visibility','visible');});hiddenLabels=[];}
 
+/* --- satellite crossfade on the flat map --- */
+function ensureSat(){
+  if(map.getSource('sat'))return;
+  map.addSource('sat',{type:'raster',tileSize:256,maxzoom:8,attribution:'Imagery © Esri',
+    tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}']});
+  map.addLayer({id:'sat',type:'raster',source:'sat',paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-brightness-max':.8,'raster-contrast':.12}});
+}
+function updateSat(){
+  const z=map.getZoom();
+  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/2.5)):0);
+}
 function setTelem(f){
   f=Math.max(0,Math.min(1,f));
   const alt=0.5*Math.pow(816,f),vel=7.66*Math.min(1,f*1.15);
@@ -1148,6 +662,7 @@ function setTelem(f){
   $('vel').textContent=vel.toFixed(2)+' KM/S';
 }
 map.on('zoom',()=>{
+  updateSat();
   if(!orbit)return;
   const z=map.getZoom();
   if(!E.active)setTelem(.55*Math.max(0,Math.min(1,(17-z)/(17-ZH))));
@@ -1155,8 +670,8 @@ map.on('zoom',()=>{
   if(returning&&z>10&&hiddenLabels.length)showLabels();
 });
 
-/* ================= Earth renderer (WebGL2): the planet wears the map itself, plus a thin atmosphere glow ================= */
-const E={cv:$('earth'),gl:null,prog:null,u:{},loading:null,texDay:null,active:false,state:'idle',
+/* ================= Earth renderer (WebGL2 shader): black space, thin atmosphere, glossy water, graded continents ================= */
+const E={cv:$('earth'),gl:null,prog:null,u:{},loading:null,active:false,state:'idle',hasNight:0,
          latA:0,lonA:0,lat0:0,lon0:0,D:5,Dh:2,Dend:11,lnD:0,f:0,ts:0,last:0,time:0,drag:false,lnD0:0,f0:0};
 const VS='#version 300 es\nvoid main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));gl_Position=vec4(p*2.-1.,0.,1.);}';
 const FS=`#version 300 es
@@ -1167,6 +682,14 @@ uniform sampler2D uDay;
 out vec4 oc;
 const float PI=3.14159265359;
 float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);
+  return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fbm(vec3 p){float a=.5,s=0.;for(int i=0;i<4;i++){s+=a*noise(p);p=p*2.03+vec3(1.7,9.2,3.1);a*=.5;}return s;}
+vec3 ngrad(vec3 p){float e=.08;
+  return vec3(noise(p+vec3(e,0,0))-noise(p-vec3(e,0,0)),noise(p+vec3(0,e,0))-noise(p-vec3(0,e,0)),noise(p+vec3(0,0,e))-noise(p-vec3(0,0,e)))/(2.*e);}
+float lumOf(vec3 c){return dot(c,vec3(.3,.59,.11));}
+float waterOf(vec3 c){return smoothstep(.01,.06,c.b-c.r)*smoothstep(-.04,.0,c.b-c.g)*(1.-smoothstep(.28,.5,lumOf(c)));}
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
 void main(){
   vec2 uv=(gl_FragCoord.xy-.5*uRes)/(.5*uRes.y);
@@ -1187,20 +710,54 @@ void main(){
   vec2 uvB=vec2(fract(uvA.x+.5)-.5,uvA.y);
   vec2 dxA=dFdx(uvA),dyA=dFdy(uvA),dxB=dFdx(uvB),dyB=dFdy(uvB);
   bool useB=dot(dxA,dxA)+dot(dyA,dyA)>dot(dxB,dxB)+dot(dyB,dyB);
-  /* the surface is exactly the map's own colours: no lighting, no clouds, no tint */
-  vec3 inner=textureGrad(uDay,uvA,useB?dxB:dxA,useB?dyB:dyA).rgb;
+  vec2 gx=useB?dxB:dxA,gy=useB?dyB:dyA;
+  vec3 dayT=textureGrad(uDay,uvA,gx,gy).rgb;
+  vec3 blurT=textureLod(uDay,uvA,3.5).rgb;
 
-  /* thin atmosphere glow, then pure black */
-  float h=max(dmin-1.,0.);
+  /* a slow travelling light gives the water its sheen; there is no day or night */
   vec3 L=normalize(vec3(-.55+.40*sin(uT*.23),.50+.18*cos(uT*.19),.70));
+  vec3 vv=normalize(ro-p);
+  float ndv=max(dot(n,vv),0.);
+  float diff=.46+.54*smoothstep(-.35,1.,dot(n,L));
+
+  float w=waterOf(dayT),wb=waterOf(blurT);
+  float coast=w*(1.-wb);
+  float lum=lumOf(dayT);
+
+  /* land: deep, graded colour with relief shading taken from the imagery brightness */
+  vec3 land=pow(dayT,vec3(1.22));
+  land=mix(vec3(lumOf(land)),land,1.18);
+  float h0=lumOf(textureLod(uDay,uvA,1.).rgb);
+  float h1=lumOf(textureLod(uDay,uvA+vec2(L.x,-L.y)*.0012,1.).rgb);
+  land*=1.+(h0-h1)*7.;
+  land*=1.+(fbm(nl*70.)-.5)*.10;
+  land*=.80;
+  land=mix(land,vec3(.50,.58,.68),smoothstep(1.25,1.42,abs(lat)));
+  land*=diff;
+
+  /* water: one flat colour everywhere, no sun reflection */
+  vec3 wcol=vec3(.010,.085,.205);
+
+  vec3 col=mix(land,wcol,w);
+
+  /* limb darkening, blue haze and a thin bright rim */
+  col*=mix(.60,1.,smoothstep(0.,.5,ndv));
+  col=mix(col,vec3(.12,.34,.80),pow(1.-ndv,3.)*.45);
+  col+=vec3(.30,.62,1.)*pow(1.-ndv,6.)*1.1+vec3(.75,.92,1.)*pow(1.-ndv,16.)*1.6;
+
+  /* tight atmosphere glow, then pure black */
+  float h=max(dmin-1.,0.);
   float g=(exp(-h*70.)*.95+exp(-h*28.)*.22+exp(-h*300.))*(1.-smoothstep(.10,.26,h));
   g*=.65+.35*clamp(dot(pc/max(dmin,1e-4),L)*.5+.5,0.,1.);
   vec3 outer=mix(vec3(.16,.40,1.),vec3(.6,.88,1.),exp(-h*140.))*g;
-  outer=pow(aces(outer*.95),vec3(1./2.2));
-  float lm=max(outer.r,max(outer.g,outer.b));
-  outer+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.012*smoothstep(.03,.2,lm);
-  outer=max(outer-.004,0.);
-  oc=vec4(mix(outer,inner,cover),1.);
+
+  vec3 res=mix(outer,col,cover);
+  res=aces(res*.95);
+  res=pow(res,vec3(1./2.2));
+  float lm=max(res.r,max(res.g,res.b));
+  res+=(hash(vec3(gl_FragCoord.xy,uT*60.))-.5)*.012*smoothstep(.03,.2,lm);
+  res=max(res-.004,0.);
+  oc=vec4(res,1.);
 }`;
 
 function earthInit(){
@@ -1217,74 +774,48 @@ function earthInit(){
     return true;
   }catch(e){console.warn('earth init failed',e);return false;}
 }
-function makeTex(src,unit){
+function makeTex(canvasOrData,unit,isCanvas){
   const gl=E.gl,t=gl.createTexture();
   gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,t);
-  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,src);
-  gl.generateMipmap(gl.TEXTURE_2D);
-  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+  if(isCanvas){
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+    const ex=gl.getExtension('EXT_texture_filter_anisotropic');
+    if(ex)gl.texParameterf(gl.TEXTURE_2D,ex.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(ex.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
+  }else{
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,canvasOrData);
+    gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+  }
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.REPEAT);
   gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-  const ex=gl.getExtension('EXT_texture_filter_anisotropic');
-  if(ex)gl.texParameterf(gl.TEXTURE_2D,ex.TEXTURE_MAX_ANISOTROPY_EXT,Math.min(8,gl.getParameter(ex.MAX_TEXTURE_MAX_ANISOTROPY_EXT)));
   return t;
 }
-
-/* The planet's skin is the real map, drawn once at country scale (no labels, no roads) by a hidden copy of the map,
-   so its colours match what you see when you zoom out over countries. */
-function buildMapTexture(size){
-  return new Promise(resolve=>{
-    let done=false,hm=null,box=null,loaded=false;
-    const finish=v=>{
-      if(done)return;done=true;
-      try{if(hm)hm.remove();}catch(e){}
-      if(box&&box.parentNode)box.parentNode.removeChild(box);
-      resolve(v);
-    };
-    const grab=()=>{
-      if(done)return;
-      try{finish(makeTex(hm.getCanvas(),0));}catch(e){console.warn('map texture upload failed',e);finish(null);}
-    };
-    try{
-      if(!STYLE_JSON){finish(null);return;}
-      const st=JSON.parse(STYLE_JSON);
-      (st.layers||[]).forEach(l=>{
-        const sl=l['source-layer'];
-        if(l.type==='symbol'||sl==='transportation'||sl==='building'||sl==='housenumber'||sl==='poi'){
-          l.layout=Object.assign({},l.layout,{visibility:'none'});
-        }
-      });
-      box=document.createElement('div');
-      box.style.cssText=`position:fixed;left:-${size+300}px;top:0;width:${size}px;height:${size}px;pointer-events:none;opacity:0`;
-      document.body.appendChild(box);
-      hm=new maplibregl.Map({
-        container:box,style:st,center:[0,0],zoom:Math.log2(size/512),interactive:false,attributionControl:false,
-        pixelRatio:1,fadeDuration:0,renderWorldCopies:false,maxCanvasSize:[size,size],
-        canvasContextAttributes:{preserveDrawingBuffer:true,antialias:false},preserveDrawingBuffer:true
-      });
-      hm.on('error',e=>console.warn('texture map',e&&e.error&&e.error.message));
-      hm.once('load',()=>{loaded=true;});
-      hm.once('idle',grab);
-      setTimeout(()=>{if(done)return;if(loaded)grab();else finish(null);},14000);
-    }catch(e){console.warn('map texture failed',e);finish(null);}
+function loadMosaic(urlFn,z){
+  return new Promise(res=>{
+    const n=1<<z,c=document.createElement('canvas');c.width=c.height=n*256;
+    const g=c.getContext('2d');let left=n*n,ok=0;
+    const done=()=>{if(--left===0)res(ok>=n*n*.8?c:null);};
+    for(let x=0;x<n;x++)for(let y=0;y<n;y++){
+      const im=new Image();im.crossOrigin='anonymous';
+      im.onload=()=>{g.drawImage(im,x*256,y*256);ok++;done();};
+      im.onerror=done;
+      im.src=urlFn(z,x,y);
+    }
   });
-}
-async function earthTexture(){
-  const maxT=E.gl.getParameter(E.gl.MAX_TEXTURE_SIZE);
-  const sizes=(maxT>=4096&&(navigator.deviceMemory||4)>=4)?[4096,2048]:[2048];
-  for(const s of sizes){const t=await buildMapTexture(s);if(t)return t;}
-  return null;
 }
 function earthPrepare(){
   if(E.loading)return E.loading;
   E.loading=(async()=>{
     if(!earthInit())return false;
-    if(E.texDay)return true;
-    const t=await earthTexture();
-    if(!t)return false;
-    E.texDay=t;return true;
-  })().then(ok=>{if(!ok)E.loading=null;return ok;});
+    const day=await loadMosaic((z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,3);
+    if(!day)return false;
+    try{
+      E.texDay=makeTex(day,0,true);
+    }catch(e){console.warn('texture upload failed',e);return false;}
+    return true;
+  })();
   return E.loading;
 }
 function earthSize(){
@@ -1374,9 +905,9 @@ function startOrbit(){
   const token=++orbitToken;
   document.body.dataset.follow='0';
   document.body.classList.add('orbit');
-  hideLabels();
-  const pre=earthPrepare();           // builds the planet's skin while the camera climbs
-  setTelem(0);
+  hideLabels();ensureSat();
+  const pre=earthPrepare();           // starts downloading the planet texture right away
+  setTelem(0);updateSat();
   map.flyTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0,duration:4800,curve:1.4,essential:true,easing:t=>Math.pow(t,1.8)});
   map.on('moveend',function h(){
     if(!orbit||returning||token!==orbitToken){map.off('moveend',h);return;}
@@ -1385,11 +916,11 @@ function startOrbit(){
   vib([30,60,30]);
 }
 async function handoff(token,pre){
-  const ok=await Promise.race([pre,new Promise(r=>setTimeout(()=>r(false),16000))]);
+  const ok=await Promise.race([pre,new Promise(r=>setTimeout(()=>r(false),8000))]);
   if(token!==orbitToken||!orbit||returning)return;
   if(ok)earthStart();else globeFallback();
 }
-/* fallback if WebGL2 or the map skin is unavailable: MapLibre's own globe (same map colours) */
+/* fallback if WebGL2 or the planet texture is unavailable: MapLibre's own globe */
 function globeFallback(){
   fallbackGlobe=true;
   map.setProjection({type:'globe'});
@@ -1432,17 +963,14 @@ function finishOrbit(){
   $('map').style.visibility='visible';
   document.body.dataset.follow='1';
   if(fallbackGlobe){map.setProjection({type:'mercator'});fallbackGlobe=false;}
-  showLabels();
+  showLabels();updateSat();
 }
 $('bOrbit').onclick=startOrbit;
 $('ret').onclick=endOrbit;
 
 /* ================= Boot ================= */
-const hadActive=!!S.active;
-if(hadActive)abortQuest('closed');   // closing or reloading the app mid-quest aborts it
 document.body.dataset.follow='1';
 updateHud();setReadout();renderMission();
-if(hadActive)setTimeout(()=>toast('Quest aborted<small>The app was closed before you finished</small>',4200),700);
 refresh();maybeFetchStops();
 (async()=>{
   let state='prompt';
@@ -1454,8 +982,7 @@ refresh();maybeFetchStops();
   if(state!=='granted')showGate(state==='denied'?'denied':'ask');
   startGPS();
 })();
-setInterval(()=>{refresh();ensureMission();questTick();renderMission();},10000);
-setInterval(()=>{if(S.active){S.active.seen=Date.now();if(++tickN%5===0)save();setReadout();}},1000);
+setInterval(()=>{refresh();ensureMission();renderMission();},10000);
 </script>
 </body>
 </html>
