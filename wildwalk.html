@@ -1129,7 +1129,7 @@ function saveQuest(){
 }
 
 /* ================= Orbit cinematic: map to space ================= */
-const ZH=3.6, ZS=5.4, FOV=30*Math.PI/180;
+const ZH=3.6, FOV=30*Math.PI/180;
 let orbit=false,returning=false,fallbackGlobe=false,spinRAF=null,dragging=false,orbitToken=0,hiddenLabels=[];
 
 /* --- labels: hidden for the whole flight --- */
@@ -1150,7 +1150,7 @@ function ensureSat(){
 }
 function updateSat(){
   const z=map.getZoom();
-  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(7.6-z)/2.4)):0);
+  if(map.getLayer('sat'))map.setPaintProperty('sat','raster-opacity',orbit?Math.max(0,Math.min(1,(6.5-z)/2.5)):0);
 }
 
 function setTelem(f){
@@ -1164,7 +1164,6 @@ map.on('zoom',()=>{
   if(!orbit)return;
   const z=map.getZoom();
   if(!E.active)setTelem(.55*Math.max(0,Math.min(1,(17-z)/(17-ZH))));
-  if(!returning&&!E.active&&!fallbackGlobe&&z<=ZS&&E.texDay&&E.gl)earthStart(true);
   if(returning&&z>9)document.body.classList.remove('orbit');
   if(returning&&z>10&&hiddenLabels.length)showLabels();
 });
@@ -1210,7 +1209,6 @@ void main(){
   vec2 gx=useB?dxB:dxA,gy=useB?dyB:dyA;
   vec3 dayT=textureGrad(uDay,uvA,gx,gy).rgb;
   vec3 blurT=textureLod(uDay,uvA,3.5).rgb;
-  dayT=clamp(dayT+(dayT-textureLod(uDay,uvA,1.3).rgb)*.45,0.,1.);
 
   /* a slow travelling light shades the land; there is no day or night */
   vec3 L=normalize(vec3(-.55+.40*sin(uT*.23),.50+.18*cos(uT*.19),.70));
@@ -1302,10 +1300,7 @@ function earthPrepare(){
   E.loading=(async()=>{
     if(!earthInit())return false;
     if(E.texDay)return true;
-    const urlF=(z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
-    const big=E.gl.getParameter(E.gl.MAX_TEXTURE_SIZE)>=4096;
-    let day=big?await loadMosaic(urlF,4):null;
-    if(!day)day=await loadMosaic(urlF,3);
+    const day=await loadMosaic((z,x,y)=>`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,3);
     if(!day)return false;
     try{E.texDay=makeTex(day,0);}catch(e){console.warn('texture upload failed',e);return false;}
     return true;
@@ -1338,11 +1333,7 @@ function earthFrame(){
   if(!E.active)return;
   const now=performance.now()/1000,dt=Math.min(.05,now-E.last);E.last=now;E.time+=dt;
   let lnD,f;
-  if(E.state==='sync'){
-    /* the globe rides the map's own zoom so the swap is invisible */
-    E.Dh=1+hAtZoom(Math.max(ZH,map.getZoom()),E.lat0);
-    lnD=Math.log(E.Dh);f=.55;E.latA=E.lat0;E.lonA=E.lon0;
-  }else if(E.state==='in'){
+  if(E.state==='in'){
     const p=Math.min(1,(now-E.ts)/4.6),e=1-Math.pow(1-p,3);
     lnD=Math.log(E.Dh)+(Math.log(E.Dend)-Math.log(E.Dh))*e;f=.55+.45*e;
     E.latA+=(0.36-E.latA)*(1-Math.exp(-dt*.9));
@@ -1362,18 +1353,17 @@ function earthFrame(){
   earthDraw();
   requestAnimationFrame(earthFrame);
 }
-function earthStart(sync){
-  if(E.active)return;
+function earthStart(){
   earthSize();
   E.lat0=player.lat*Math.PI/180;E.lon0=player.lng*Math.PI/180;
   E.latA=E.lat0;E.lonA=E.lon0;
   const H=innerHeight,W=innerWidth,tf=Math.tan(FOV/2),rad=.40*Math.min(W,H);
   E.Dh=1+hAtZoom(ZH,E.lat0);
   E.Dend=Math.sqrt(1+Math.pow(H/(2*rad*tf),2));
-  E.D=E.Dh;E.state=sync?'sync':'in';E.ts=E.last=performance.now()/1000;E.time=0;E.drag=false;E.active=true;
+  E.D=E.Dh;E.state='in';E.ts=E.last=performance.now()/1000;E.time=0;E.drag=false;E.active=true;
   document.body.classList.add('earth-on','spun');
   earthFrame();
-  if(!sync)setTimeout(()=>{if(E.active)$('map').style.visibility='hidden';},1100);
+  setTimeout(()=>{if(E.active)$('map').style.visibility='hidden';},1100);
 }
 function earthStop(){
   E.active=false;E.state='idle';
@@ -1418,10 +1408,7 @@ function startOrbit(){
 async function handoff(token,pre){
   const ok=await Promise.race([pre,new Promise(r=>setTimeout(()=>r(false),16000))]);
   if(token!==orbitToken||!orbit||returning)return;
-  if(ok){
-    if(E.active&&E.state==='sync'){E.Dh=1+hAtZoom(ZH,E.lat0);E.state='in';E.ts=performance.now()/1000;setTimeout(()=>{if(E.active&&E.state!=='out')$('map').style.visibility='hidden';},900);}
-    else earthStart();
-  }else globeFallback();
+  if(ok)earthStart();else globeFallback();
 }
 /* fallback if WebGL2 or the planet imagery is unavailable: MapLibre's own globe */
 function globeFallback(){
