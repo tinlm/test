@@ -431,7 +431,7 @@ async function loadMapStyle(){
 const map=new maplibregl.Map({
   container:'map',center:[DEFAULT_POS.lng,DEFAULT_POS.lat],zoom:17,minZoom:-2,maxZoom:19.5,
   style:{version:8,sources:{},layers:[{id:'bg',type:'background',paint:{'background-color':'#050608'}}]},
-  attributionControl:false,dragRotate:false,pitchWithRotate:false,touchPitch:false
+  attributionControl:false,cancelPendingTileRequestsWhileZooming:false,maxTileCacheSize:600,dragRotate:false,pitchWithRotate:false,touchPitch:false
 });
 map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({compact:true}),'bottom-right');
@@ -450,7 +450,27 @@ function addRange(){
 }
 map.on('style.load',()=>{addRange();addQuestLayers();});
 let styleReady=false,STYLE_JSON='';
-loadMapStyle().then(s=>{STYLE_JSON=JSON.stringify(s);map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;});});
+/* warm the browser cache with the low-zoom world tiles so zooming out to space doesn't wait on the network */
+let warmDone=false,warmTpl=null;
+async function warmTiles(){
+  if(warmDone||!STYLE_JSON)return;warmDone=true;
+  try{
+    const st=JSON.parse(STYLE_JSON);
+    const src=Object.values(st.sources||{}).find(x=>x.type==='vector');
+    if(!src)return;
+    warmTpl=(src.tiles&&src.tiles[0])||(await (await fetch(src.url)).json()).tiles[0];
+    const list=[];
+    for(let z=0;z<=3;z++){const n=1<<z;for(let x=0;x<n;x++)for(let y=0;y<n;y++)list.push([z,x,y]);}
+    const lat=player.lat*Math.PI/180,Z=5,n=1<<Z;
+    const cx=Math.floor((player.lng+180)/360*n),cy=Math.floor((1-Math.log(Math.tan(lat)+1/Math.cos(lat))/Math.PI)/2*n);
+    for(let z=4;z<=6;z++){const k=z-Z,c=[Math.floor(cx*Math.pow(2,k)),Math.floor(cy*Math.pow(2,k))],r=z===4?3:2;
+      for(let dx=-r;dx<=r;dx++)for(let dy=-r;dy<=r;dy++){const m=1<<z;list.push([z,((c[0]+dx)%m+m)%m,Math.max(0,Math.min(m-1,c[1]+dy))]);}}
+    let i=0;
+    const worker=async()=>{while(i<list.length){const t=list[i++];try{await fetch(warmTpl.replace('{z}',t[0]).replace('{x}',t[1]).replace('{y}',t[2]));}catch(e){}}};
+    await Promise.all([worker(),worker(),worker(),worker()]);
+  }catch(e){warmDone=false;warmTpl=null;}
+}
+loadMapStyle().then(s=>{STYLE_JSON=JSON.stringify(s);map.setStyle(s,{diff:false});map.once('style.load',()=>{styleReady=true;setTimeout(warmTiles,2500);});});
 
 function mkMarker(html,lng,lat,onClick,z){
   const el=document.createElement('div');el.innerHTML=html;
@@ -1412,7 +1432,7 @@ function startOrbit(){
   const token=++orbitToken;
   document.body.dataset.follow='0';
   document.body.classList.add('orbit');
-  hideLabels();ensureSat();
+  hideLabels();ensureSat();warmTiles();
   const pre=earthPrepare();           // downloads the planet imagery while the camera climbs
   setTelem(0);
   updateSat();
