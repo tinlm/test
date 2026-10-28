@@ -118,6 +118,8 @@
   body.orbit .hud,body.orbit .nav,body.orbit .corner,body.orbit .hint{opacity:0;pointer-events:none}
   .maplibregl-marker{transition:opacity .6s}
   body.orbit .maplibregl-marker{opacity:0!important;pointer-events:none}
+  body.orbit .maplibregl-marker.mme{opacity:1!important}
+  #you{position:fixed;left:0;top:0;width:0;height:0;z-index:3;pointer-events:none;opacity:0}
   body.orbit .maplibregl-ctrl-bottom-right{bottom:calc(var(--bar) + 8px)}
   #orbit{position:fixed;inset:0;z-index:1500;pointer-events:none;overflow:hidden}
   .lbar{position:absolute;left:0;right:0;background:#000;display:flex;align-items:center;justify-content:space-between;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));transition:transform 1.3s cubic-bezier(.2,.8,.2,1);font:400 10px var(--mono);letter-spacing:.22em;color:#aab4bf;text-transform:uppercase}
@@ -458,6 +460,8 @@ function mkMarker(html,lng,lat,onClick,z){
   return {mk,el};
 }
 const me=mkMarker('<div class="me"></div>',player.lng,player.lat,null,10);
+try{(me.getElement?me.getElement():me.el).classList.add('mme');}catch(e){}
+const youEl=document.createElement('div');youEl.id='you';youEl.innerHTML='<div class="me" style="position:absolute;left:-7px;top:-7px"></div>';document.body.appendChild(youEl);
 
 function setReadout(){$('mode').textContent=S.active?fmtT(Date.now()-S.active.startedAt)+(SIM?' · SIM':''):(SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING'));}
 function setPlayer(lat,lng,pan){
@@ -1328,6 +1332,20 @@ function earthDraw(){
   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,E.texDay);gl.uniform1i(E.u.uDay,0);
   gl.drawArrays(gl.TRIANGLES,0,3);
 }
+/* your position follows the planet; fades out when it turns behind the globe */
+function placeYou(){
+  const b=camBasis(E.latA+Math.sin(E.time*.31)*.012,E.lonA);
+  const la=player.lat*Math.PI/180,lo=player.lng*Math.PI/180;
+  const P=[Math.cos(la)*Math.sin(lo),Math.sin(la),Math.cos(la)*Math.cos(lo)];
+  const d=(a)=>P[0]*a[0]+P[1]*a[1]+P[2]*a[2];
+  const nx=d(b.x),ny=d(b.y),nz=d(b.z);
+  const vis=E.D*nz-1,tf=Math.tan(FOV/2),k=1/(E.D-nz)/tf;
+  const ux=nx*k,uy=ny*k,r=Math.sin(E.time*.17)*.012,cr=Math.cos(r),sr=Math.sin(r);
+  const sx=cr*ux-sr*uy,sy=sr*ux+cr*uy,H=innerHeight;
+  youEl.style.transform='translate('+(innerWidth/2+sx*H/2)+'px,'+(H/2-sy*H/2)+'px)';
+  const t=Math.max(0,Math.min(1,vis/.12));
+  youEl.style.opacity=E.active&&E.state!=='out'||E.active?(t*t*(3-2*t)):0;
+}
 const wrapA=a=>Math.atan2(Math.sin(a),Math.cos(a));
 function earthFrame(){
   if(!E.active)return;
@@ -1350,7 +1368,7 @@ function earthFrame(){
     if(p>=1){earthStop();return;}
   }
   E.lnD=lnD;E.f=f;E.D=Math.exp(lnD);setTelem(f);
-  earthDraw();
+  earthDraw();placeYou();
   requestAnimationFrame(earthFrame);
 }
 function earthStart(){
@@ -1369,7 +1387,7 @@ function earthStop(){
   E.active=false;E.state='idle';
   map.jumpTo({center:[player.lng,player.lat],zoom:ZH,pitch:0,bearing:0});
   $('map').style.visibility='visible';
-  document.body.classList.remove('earth-on');
+  document.body.classList.remove('earth-on');youEl.style.opacity=0;
   map.flyTo({center:[player.lng,player.lat],zoom:17,pitch:0,bearing:0,duration:4600,curve:1.4,essential:true,easing:t=>1-Math.pow(1-t,1.8)});
   map.on('moveend',function h(){if(returning&&map.getZoom()>16.5){map.off('moveend',h);finishOrbit();}});
 }
