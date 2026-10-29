@@ -1135,7 +1135,7 @@ $('qdB').addEventListener('click',e=>{
     case 'pick':if(ED)enterPick();break;
     case 'save':saveQuest();break;
     case 'delq':
-      if(ED&&S.journeys.some(j=>j.nodes.some(n=>n.questId===ED.q.id))){toast('Used in a journey<small>Remove it from the journey first</small>');break;}
+      if(ED&&jUses(ED.q.id)){toast('Used in a journey<small>Remove it from the journey first</small>');break;}
       if(ED&&confirm(`Delete "${ED.q.name||'this quest'}"? Past sessions are kept.`)){
         S.quests=S.quests.filter(x=>x.id!==ED.q.id);save();dropEditor();renderQD();toast('Quest deleted');
       }
@@ -1155,66 +1155,60 @@ function saveQuest(){
   toast(`Quest saved<small>${esc(q.name)} · ${q.locs.length} places · ${questTaskCount(q)} tasks</small>`,2600);
 }
 
-/* ================= Journeys: stitch quests into a golden path with side quests ================= */
+/* ================= Journeys: a golden path of stages, each gated by an ordered tree of side quests ================= */
+/* journey = {id,name,stages:[{id,questId,gate:[side]}]}   side = {id,questId,subs:[side]}
+   Play order is depth-first: a side quest's sub-quests come first, then the side quest itself, then the next side quest in the
+   gate, and when the gate is finished the stage opens. The whole journey is one strict line: only the first unfinished step is open. */
 let JED=null;
 const jPad=n=>String(n).padStart(2,'0');
-const jById=(j,id)=>j.nodes.find(n=>n.id===id);
-const jMains=j=>j.nodes.filter(n=>n.kind==='main');
-const jKids=(j,id)=>j.nodes.filter(n=>n.kind==='side'&&n.unlocks===id);
-const jDone=j=>(S.jprog&&S.jprog[j.id])||{};
 const jQuest=n=>S.quests.find(x=>x.id===n.questId);
 const jName=n=>{const q=jQuest(n);return q?q.name:'Missing quest';};
-function jReqs(j,n){
-  const r=jKids(j,n.id).map(x=>x.id);
-  if(n.kind==='main'){const m=jMains(j),k=m.indexOf(n);if(k>0)r.unshift(m[k-1].id);}
-  return r;
+const jDone=j=>(S.jprog&&S.jprog[j.id])||{};
+function jSeq(j){
+  const out=[];
+  const walk=(n,kind,depth,si)=>{
+    if(kind==='side')n.subs.forEach(s=>walk(s,'side',depth+1,si));
+    out.push({n,kind,depth,si});
+  };
+  j.stages.forEach((st,si)=>{st.gate.forEach(g=>walk(g,'side',0,si));walk(st,'stage',0,si);});
+  return out.map((e,i)=>Object.assign(e,{step:i+1}));
 }
+function jNext(j){const d=jDone(j);return jSeq(j).find(e=>!d[e.n.id]&&jQuest(e.n))||null;}
 function jState(j,n){
-  const d=jDone(j);if(d[n.id])return 'done';
+  const d=jDone(j);
+  if(d[n.id])return 'done';
   if(!jQuest(n))return 'missing';
-  return jReqs(j,n).every(id=>d[id])?'open':'locked';
+  const nx=jNext(j);
+  return nx&&nx.n.id===n.id?'open':'locked';
 }
 function jProg(j){
-  const d=jDone(j),m=jMains(j),s=j.nodes.filter(n=>n.kind==='side');
-  const dm=m.filter(n=>d[n.id]).length,ds=s.filter(n=>d[n.id]).length;
-  return {mains:m.length,doneMains:dm,sides:s.length,doneSides:ds,complete:m.length>0&&dm===m.length};
+  const d=jDone(j),sq=jSeq(j),st=sq.filter(e=>e.kind==='stage'),sd=sq.filter(e=>e.kind==='side');
+  const ds=st.filter(e=>d[e.n.id]).length;
+  return {mains:st.length,doneMains:ds,sides:sd.length,doneSides:sd.filter(e=>d[e.n.id]).length,total:sq.length,done:sq.filter(e=>d[e.n.id]).length,complete:st.length>0&&ds===st.length};
 }
-/* a side quest may unlock any other node, unless that would make a loop */
-function jTargets(j,x){
-  return j.nodes.filter(t=>{
-    if(t.id===x.id)return false;
-    let c=t,guard=0;
-    while(c&&c.kind==='side'&&guard++<50){if(c.unlocks===x.id)return false;c=jById(j,c.unlocks);}
-    return true;
-  });
-}
-function jDescendants(j,id){
-  const out=[];const walk=i=>jKids(j,i).forEach(k=>{out.push(k.id);walk(k.id);});walk(id);return out;
-}
-function jOpenSet(j){return new Set(j.nodes.filter(n=>jState(j,n)==='open').map(n=>n.id));}
+function jUses(qid){return S.journeys.some(j=>jSeq(j).some(e=>e.n.questId===qid));}
 function jStart(jid,nid){
   const j=S.journeys.find(x=>x.id===jid);if(!j)return;
-  const n=jById(j,nid);if(!n)return;
-  const st=jState(j,n);
-  if(st==='locked'){toast('Locked<small>Finish the required quests first</small>');return;}
+  const e=jSeq(j).find(x=>x.n.id===nid);if(!e)return;
+  const st=jState(j,e.n);
+  if(st==='locked'){const nx=jNext(j);toast(`Locked<small>Finish "${esc(nx?jName(nx.n):'the earlier quest')}" first</small>`);return;}
   if(st==='missing'){toast('This quest was deleted');return;}
-  const k=jMains(j).indexOf(n);
-  startQuest(n.questId,{jid:j.id,nid:n.id,jname:j.name,label:n.kind==='main'?'Stage '+(k+1):'Side quest'});
+  startQuest(e.n.questId,{jid:j.id,nid:e.n.id,jname:j.name,label:e.kind==='stage'?'Stage '+(e.si+1):'Side quest'});
 }
-/* called when a quest run is finished: marks the journey node done and reports what it unlocked */
+/* called when a run finishes: marks the step done and reports what opened up */
 function jOnFinish(R){
   if(!R.journey)return;
-  const j=S.journeys.find(x=>x.id===R.journey.jid);if(!j||!jById(j,R.journey.nid))return;
-  const was=jDone(j)[R.journey.nid],before=jOpenSet(j),pBefore=jProg(j);
+  const j=S.journeys.find(x=>x.id===R.journey.jid);if(!j)return;
+  const e=jSeq(j).find(x=>x.n.id===R.journey.nid);if(!e)return;
+  const was=jDone(j)[e.n.id],pBefore=jProg(j);
   if(!S.jprog)S.jprog={};
   if(!S.jprog[j.id])S.jprog[j.id]={};
-  if(!was)S.jprog[j.id][R.journey.nid]=R.id;
-  const after=jOpenSet(j),nu=[...after].filter(id=>!before.has(id)).map(id=>jName(jById(j,id)));
-  const pa=jProg(j);
+  if(!was)S.jprog[j.id][e.n.id]=R.id;
+  const pa=jProg(j),nx=jNext(j);
   let note=`Journey · ${j.name}`;
   if(!was&&pa.complete&&!pBefore.complete){R.xp+=150;note+=' · journey complete · +150 XP bonus';}
-  else if(nu.length)note+=' · unlocked: '+nu.join(', ');
   else if(was)note+=' · already cleared';
+  else if(nx)note+=` · ${e.kind==='stage'?'stage cleared · ':''}next: ${jName(nx.n)}`;
   R.jnote=note;
 }
 
@@ -1224,66 +1218,77 @@ function journeysHTML(){
   let h=tabsHTML('j');
   if(SIM)h+=`<div class="qrow"><button class="btn sm" data-act="jnew" style="flex:1">+ New journey</button></div>`;
   h+=`<div class="qh3">Journeys</div>`;
-  if(!S.journeys.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No journeys yet. Tap New journey to chain your quests into a golden path.':'No journeys yet. Turn on Sim to create one.'}</div>`;
+  if(!S.journeys.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No journeys yet. Tap New journey to build a golden path.':'No journeys yet. Turn on Sim to create one.'}</div>`;
   S.journeys.forEach(j=>{
-    const p=jProg(j),pct=p.mains?Math.round(p.doneMains/p.mains*100):0;
+    const p=jProg(j),pct=p.total?Math.round(p.done/p.total*100):0;
     h+=`<div class="qc jc"><div class="qch"><b>${esc(j.name)}</b></div>
       <div class="qsub" style="margin-top:6px">${p.mains} stages · ${p.sides} side quests${p.complete?' · complete':''}</div>
-      <div class="qsub">Golden path ${p.doneMains}/${p.mains}${p.sides?` · side ${p.doneSides}/${p.sides}`:''}</div>
+      <div class="qsub">Progress ${p.done}/${p.total}</div>
       <div class="pb gold"><i style="width:${pct}%"></i></div>
       <div class="qrow"><button class="btn sm" data-act="jopen" data-id="${j.id}">Open</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div></div>`;
   });
   return h;
 }
-function jNodeHTML(j,n,depth,k){
-  const st=jState(j,n),q=jQuest(n),d=jDone(j),R=S.active;
-  const reqs=jReqs(j,n).filter(id=>!d[id]).map(id=>jName(jById(j,id)));
-  const kids=jKids(j,n.id);
+function jCardHTML(j,e,nx){
+  const n=e.n,st=jState(j,n),q=jQuest(n),R=S.active;
   const chip={done:'CLEARED',open:'AVAILABLE',locked:'LOCKED',missing:'MISSING'}[st];
-  let h=`<div class="jn ${n.kind} ${st}" style="margin-left:${depth*14}px">
-    <div class="jh"><span class="idx jx">${n.kind==='main'?'STAGE '+jPad(k+1):'SIDE'}</span><span class="tag">${chip}</span></div>
+  let h=`<div class="jn ${e.kind==='stage'?'main':'side'} ${st}" style="margin-left:${e.depth*14}px">
+    <div class="jh"><span class="idx jx">${e.kind==='stage'?'STAGE '+jPad(e.si+1):'SIDE'}</span><span class="tag">#${jPad(e.step)} · ${chip}</span></div>
     <b class="jq">${esc(jName(n))}</b>
     <div class="qsub" style="margin-top:6px">${q?`${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}`:'This quest was deleted'}</div>`;
-  if(st==='locked')h+=`<div class="qsub" style="margin-top:4px">Requires: ${esc(reqs.join(' · '))}</div>`;
+  if(st==='locked'&&nx)h+=`<div class="qsub" style="margin-top:4px">Finish first: ${esc(jName(nx.n))}</div>`;
   if(st==='open'||st==='done')h+=`<div class="qrow"><button class="btn sm${st==='done'?' ghost':''}" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>${st==='done'?'Replay':'Start'}</button></div>`;
-  h+='</div>';
-  if(kids.length){
-    h+=`<div class="jlbl" style="margin-left:${depth*14+4}px">Required first</div>`;
-    kids.forEach(c=>{h+=jNodeHTML(j,c,depth+1);});
-  }
-  return h;
+  return h+'</div>';
 }
 function jviewHTML(){
   const j=S.journeys.find(x=>x.id===QV.jid);if(!j)return journeysHTML();
-  const p=jProg(j),pct=p.mains?Math.round(p.doneMains/p.mains*100):0;
+  const p=jProg(j),pct=p.total?Math.round(p.done/p.total*100):0,nx=jNext(j);
   let h=`<div class="qrow" style="margin-top:0"><button class="btn ghost sm" data-act="jback">← Journeys</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div>`;
   h+=`<div class="qbig" style="font-size:22px;letter-spacing:.2em">${esc(j.name)}</div>
-    <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Golden path ${p.doneMains}/${p.mains}${p.sides?` · side quests ${p.doneSides}/${p.sides}`:''}</div>
+    <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Stages ${p.doneMains}/${p.mains} · side quests ${p.doneSides}/${p.sides}</div>
     <div class="pb gold"><i style="width:${pct}%"></i></div>`;
-  jMains(j).forEach((m,k)=>{h+=jNodeHTML(j,m,0,k);});
+  let lastSi=-1;
+  jSeq(j).forEach(e=>{
+    if(e.si!==lastSi){
+      lastSi=e.si;
+      const hasGate=j.stages[e.si].gate.length>0;
+      h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">${hasGate?`Side quests to unlock stage ${jPad(e.si+1)}`:`Stage ${jPad(e.si+1)}`}</div>`;
+    }
+    h+=jCardHTML(j,e,nx);
+  });
   h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="jreset" data-id="${j.id}">Reset progress</button></div>`;
   return h;
 }
-function jnodeEditHTML(j,n,depth,k){
-  const qopts=S.quests.map(q=>`<option value="${q.id}"${q.id===n.questId?' selected':''}>${esc(q.name)}</option>`).join('');
-  let h=`<div class="jn ${n.kind} edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${n.kind==='main'?'STAGE '+jPad(k+1):'SIDE'}</span>`;
-  if(n.kind==='main'){const m=jMains(j);h+=`<div class="mini"><button data-act="jup" data-n="${n.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${k<m.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div>`;}
-  else h+=`<div class="mini"><button data-act="jdel" data-n="${n.id}">×</button></div>`;
-  h+=`</div><select class="qi sel" data-f="jq" data-n="${n.id}">${qopts}</select>`;
-  if(n.kind==='side'){
-    const topts=jTargets(j,n).map(t=>{const lab=(t.kind==='main'?'Stage '+jPad(jMains(j).indexOf(t)+1):'Side')+' · '+jName(t);return `<option value="${t.id}"${t.id===n.unlocks?' selected':''}>${esc(lab)}</option>`;}).join('');
-    h+=`<div class="qsub" style="margin-top:8px">Required to unlock</div><select class="qi sel" data-f="jt" data-n="${n.id}">${topts}</select>`;
-  }
-  h+=`<div class="qrow"><button class="btn ghost sm" data-act="jside" data-n="${n.id}">+ Side quest</button></div></div>`;
-  jKids(j,n.id).forEach(c=>{h+=jnodeEditHTML(j,c,depth+1);});
+
+/* --- editor --- */
+function jFind(j,id){   // -> {arr,i} of the array that holds this side quest or stage
+  let hit=null;
+  const walk=arr=>{arr.forEach((n,i)=>{if(hit)return;if(n.id===id){hit={arr,i};return;}if(n.subs)walk(n.subs);if(n.gate&&!hit)walk(n.gate);});};
+  walk(j.stages);return hit;
+}
+function jQOpts(sel){return S.quests.map(q=>`<option value="${q.id}"${q.id===sel?' selected':''}>${esc(q.name)}</option>`).join('');}
+function jSideEditHTML(j,n,depth,idx,len){
+  let h='';
+  n.subs.forEach((s,i)=>{h+=jSideEditHTML(j,s,depth+1,i,n.subs.length);});
+  h+=`<div class="jn side edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${depth?'SUB':'SIDE'}</span>
+    <div class="mini"><button data-act="jup" data-n="${n.id}"${idx?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${idx<len-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div></div>
+    <select class="qi sel" data-f="jq" data-n="${n.id}">${jQOpts(n.questId)}</select>
+    <div class="qrow"><button class="btn ghost sm" data-act="jsub" data-n="${n.id}">+ Sub-quest first</button></div></div>`;
   return h;
 }
 function jeditHTML(){
   const j=JED.j;
   let h=`<input class="qi name" id="jName" placeholder="Journey name" maxlength="60" value="${esc(j.name)}">`;
-  h+=`<div class="qsub" style="margin-top:8px">Golden path: quests in order. Side quests are required to unlock a stage or another side quest.</div>`;
-  jMains(j).forEach((m,k)=>{h+=jnodeEditHTML(j,m,0,k);});
-  h+=`<div class="qrow"><button class="btn${jMains(j).length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
+  h+=`<div class="qsub" style="margin-top:8px;line-height:1.6">Top to bottom is the play order. Side quests gate the stage below them. A side quest's sub-quests must be done before it.</div>`;
+  j.stages.forEach((st,k)=>{
+    h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`;
+    st.gate.forEach((g,i)=>{h+=jSideEditHTML(j,g,0,i,st.gate.length);});
+    h+=`<div class="qrow" style="margin-top:8px"><button class="btn ghost sm" data-act="jgate" data-n="${st.id}">+ Side quest to unlock this stage</button></div>`;
+    h+=`<div class="jn main edit"><div class="jh"><span class="idx jx">STAGE ${jPad(k+1)}</span>
+      <div class="mini"><button data-act="jup" data-n="${st.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${st.id}"${k<j.stages.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${st.id}">×</button></div></div>
+      <select class="qi sel" data-f="jq" data-n="${st.id}">${jQOpts(st.questId)}</select></div>`;
+  });
+  h+=`<div class="qrow"><button class="btn${j.stages.length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
   h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
   return h;
 }
@@ -1292,12 +1297,15 @@ function jOpenEditor(j,isNew){JED={j,isNew,snap:JSON.stringify(j)};QV={view:'jed
 function jSave(){
   const j=JED.j;j.name=(j.name||'').trim();
   if(!j.name){toast('Name your journey');const n=$('jName');if(n)n.focus();return;}
-  if(!jMains(j).length){toast('Add at least one stage');return;}
-  if(j.nodes.some(n=>!jQuest(n))){toast('Every stage needs a quest');return;}
+  if(!j.stages.length){toast('Add at least one stage');return;}
+  if(jSeq(j).some(e=>!jQuest(e.n))){toast('Every step needs a quest');return;}
   const k=S.journeys.findIndex(x=>x.id===j.id);
   if(k>=0)S.journeys[k]=j;else S.journeys.push(j);
+  /* keep progress only for steps that still exist */
+  const ids=new Set(jSeq(j).map(e=>e.n.id));
+  if(S.jprog&&S.jprog[j.id])Object.keys(S.jprog[j.id]).forEach(i=>{if(!ids.has(i))delete S.jprog[j.id][i];});
   save();JED=null;QV={view:'jview',jid:j.id};renderQD();
-  toast(`Journey saved<small>${esc(j.name)} · ${jMains(j).length} stages</small>`,2400);
+  toast(`Journey saved<small>${esc(j.name)} · ${j.stages.length} stages</small>`,2400);
 }
 function jClick(b){
   const a=b.dataset.act,id=b.dataset.id,nid=b.dataset.n;
@@ -1308,19 +1316,19 @@ function jClick(b){
     case 'jopen':QV={view:'jview',jid:id};renderQD();break;
     case 'jstart':jStart(id,nid);break;
     case 'jreset':if(confirm('Reset progress on this journey?')){if(S.jprog)delete S.jprog[id];save();renderQD();}break;
-    case 'jnew':if(SIM){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),nodes:[]},true);}break;
+    case 'jnew':if(SIM){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),stages:[]},true);}break;
     case 'jedit':{const j=S.journeys.find(x=>x.id===id);if(SIM&&j)jOpenEditor(clone(j),false);break;}
     /* editor */
-    case 'jstage':if(JED){JED.j.nodes.push({id:qid(),kind:'main',questId:S.quests[0].id,unlocks:null});renderQD();}break;
-    case 'jside':if(JED){JED.j.nodes.push({id:qid(),kind:'side',questId:S.quests[0].id,unlocks:nid});renderQD();}break;
-    case 'jdel':if(JED){
-      const j=JED.j,n=jById(j,nid);if(!n)break;
-      if(n.kind==='main'){const gone=new Set([nid,...jDescendants(j,nid)]);j.nodes=j.nodes.filter(x=>!gone.has(x.id));}
-      else{jKids(j,nid).forEach(c=>{c.unlocks=n.unlocks;});j.nodes=j.nodes.filter(x=>x.id!==nid);}
-      renderQD();}break;
-    case 'jup':case 'jdown':if(JED){
-      const j=JED.j,m=jMains(j),k=m.findIndex(x=>x.id===nid),o=m[k+(a==='jup'?-1:1)];
-      if(o){const A=j.nodes.indexOf(m[k]),B=j.nodes.indexOf(o);[j.nodes[A],j.nodes[B]]=[j.nodes[B],j.nodes[A]];renderQD();}}break;
+    case 'jstage':if(JED){JED.j.stages.push({id:qid(),questId:S.quests[0].id,gate:[]});renderQD();}break;
+    case 'jgate':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].gate.push({id:qid(),questId:S.quests[0].id,subs:[]});renderQD();}}break;
+    case 'jsub':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].subs.push({id:qid(),questId:S.quests[0].id,subs:[]});renderQD();}}break;
+    case 'jdel':if(JED){const f=jFind(JED.j,nid);if(f){
+      const n=f.arr[f.i],cnt=n.gate?n.gate.length+1:(n.subs&&n.subs.length?n.subs.length+1:0);
+      if(cnt>1&&!confirm('Delete this and everything nested under it?'))break;
+      f.arr.splice(f.i,1);renderQD();}}break;
+    case 'jup':case 'jdown':if(JED){const f=jFind(JED.j,nid);if(f){
+      const o=f.i+(a==='jup'?-1:1);
+      if(o>=0&&o<f.arr.length){[f.arr[f.i],f.arr[o]]=[f.arr[o],f.arr[f.i]];renderQD();}}}break;
     case 'jsave':if(JED)jSave();break;
     case 'jdelj':if(JED&&confirm(`Delete "${JED.j.name||'this journey'}"?`)){
       S.journeys=S.journeys.filter(x=>x.id!==JED.j.id);if(S.jprog)delete S.jprog[JED.j.id];save();JED=null;QV={view:'journeys'};renderQD();toast('Journey deleted');}break;
@@ -1328,11 +1336,21 @@ function jClick(b){
 }
 $('qdB').addEventListener('input',e=>{if(JED&&e.target.id==='jName')JED.j.name=e.target.value;});
 $('qdB').addEventListener('change',e=>{
-  const t=e.target;if(!JED||!t.dataset.n)return;
-  const n=jById(JED.j,t.dataset.n);if(!n)return;
-  if(t.dataset.f==='jq')n.questId=t.value;else if(t.dataset.f==='jt')n.unlocks=t.value;
-  renderQD();
+  const t=e.target;if(!JED||t.dataset.f!=='jq')return;
+  const f=jFind(JED.j,t.dataset.n);if(!f)return;
+  f.arr[f.i].questId=t.value;renderQD();
 });
+/* first-release journeys (a flat list of nodes) are converted to the nested form */
+(function(){
+  let ch=false;
+  S.journeys=S.journeys.map(j=>{
+    if(!j.nodes)return j;ch=true;
+    const kids=id=>j.nodes.filter(n=>n.kind==='side'&&n.unlocks===id);
+    const side=n=>({id:n.id,questId:n.questId,subs:kids(n.id).map(side)});
+    return {id:j.id,name:j.name,createdAt:j.createdAt,stages:j.nodes.filter(n=>n.kind==='main').map(m=>({id:m.id,questId:m.questId,gate:kids(m.id).map(side)}))};
+  });
+  if(ch)save();
+})();
 
 /* ================= Orbit cinematic: map to space ================= */
 const ZH=3.6, FOV=30*Math.PI/180;
