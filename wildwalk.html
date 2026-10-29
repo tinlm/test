@@ -168,6 +168,22 @@
   .qe{display:flex;align-items:center;gap:8px;margin-top:8px}
   .sq{width:14px;height:14px;border:1px solid var(--hi);flex:none}
 
+  .tabs{display:flex;border:1px solid var(--line);margin-bottom:14px}
+  .tabs button{flex:1;background:transparent;border:0;color:var(--muted);padding:13px 8px;font:500 11px var(--sans);letter-spacing:.22em;text-transform:uppercase}
+  .tabs button.on{background:#fff;color:#000}
+  :root{--gold:#d8b45a}
+  .pb.gold i{background:var(--gold)}
+  .jc{border-left:3px solid var(--gold)}
+  .jn{border:1px solid var(--line);background:var(--panel);padding:12px;margin-top:10px}
+  .jn.main{border-left:3px solid var(--gold)}
+  .jn.side{border-left:3px dashed #6d7782}
+  .jn.locked,.jn.missing{opacity:.5}
+  .jn.done .jq::after{content:" ✓";color:var(--gold)}
+  .jh{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
+  .jn.main .jx{border-color:var(--gold);color:var(--gold)}
+  .jq{font:500 16px var(--sans);letter-spacing:.12em;text-transform:uppercase}
+  .jlbl{margin-top:8px;font:400 9px var(--mono);letter-spacing:.24em;color:var(--muted);text-transform:uppercase}
+  select.qi.sel{font-size:14px;letter-spacing:.06em;background:#000;border:1px solid var(--line);padding:10px 8px;-webkit-appearance:none;appearance:none}
   .pickbar{position:absolute;left:10px;right:10px;bottom:70px;z-index:1100;display:none;align-items:center;gap:8px;background:#000e;border:1px solid #fff;padding:8px 10px}
   .pickbar.on{display:flex}
   .pickbar span{flex:1;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
@@ -319,7 +335,7 @@ const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
 const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 
 /* ================= State ================= */
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,quests:[],runs:[],active:null};
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,quests:[],runs:[],active:null,journeys:[],jprog:{}};
 let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
 let SIM=false;   // not saved: every launch starts on real GPS
 let PICK=false,ED=null,QV={view:'list'};   // quest editor: picking places on the map / draft quest / drawer view
@@ -765,7 +781,7 @@ function renderDex(){
 }
 $('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
 $('dexX').onclick=()=>$('dex').classList.remove('open');
-$('reset').onclick=()=>{if(confirm('Reset all progress?\nYour saved quests are kept. Session history is cleared.')){localStorage.setItem(LS,JSON.stringify({quests:S.quests}));location.reload();}};
+$('reset').onclick=()=>{if(confirm('Reset all progress?\nYour saved quests and journeys are kept. Session history is cleared.')){localStorage.setItem(LS,JSON.stringify({quests:S.quests,journeys:S.journeys}));location.reload();}};
 $('bLoc').onclick=()=>{document.body.dataset.follow='1';map.easeTo({center:[player.lng,player.lat],zoom:Math.max(map.getZoom(),17),duration:600});};
 
 function setSim(on){
@@ -849,13 +865,13 @@ function focusTarget(){
 }
 
 /* --- runner --- */
-function startQuest(id){
+function startQuest(id,ctx){
   if(S.active){toast('Quest in progress<small>Finish or abort it first</small>');return;}
   const q=S.quests.find(x=>x.id===id);
   if(!q||!q.locs.length){toast('This quest has no locations');return;}
   if(!gotFix&&!SIM){toast('Waiting for GPS<small>Enable location or use Sim mode</small>');return;}
   S.active={id:'r'+Date.now().toString(36),questId:q.id,name:q.name,startedAt:Date.now(),endedAt:null,seen:Date.now(),status:'active',
-    sim:SIM,walked:0,idx:0,phase:'travel',
+    sim:SIM,walked:0,idx:0,phase:'travel',journey:ctx?{jid:ctx.jid,nid:ctx.nid}:null,jlabel:ctx?ctx.label:null,jname:ctx?ctx.jname:null,
     locs:q.locs.map(l=>({name:l.name,lat:l.lat,lng:l.lng,arrivedAt:null,completedAt:null,tasks:l.tasks.map(t=>({text:t.text,doneAt:null}))}))};
   lastPt={...player};
   save();$('qd').classList.remove('open');
@@ -865,7 +881,7 @@ function startQuest(id){
 function onQuestChange(){
   drawQuestMarkers();renderMission();setReadout();
   $('bQuest').classList.toggle('on',!!S.active);
-  if($('qd').classList.contains('open')&&QV.view==='list')renderQD();
+  if($('qd').classList.contains('open')&&(QV.view==='list'||QV.view==='journeys'||QV.view==='jview'))renderQD();
 }
 function questTick(){
   const R=S.active;if(!R)return;
@@ -893,6 +909,7 @@ function completeLoc(R){
 function finishQuest(R){
   R.endedAt=Date.now();R.status='completed';
   const st=runStats(R);R.xp=R.locs.length*40+st.tasks*10;
+  try{jOnFinish(R);}catch(e){console.warn('journey',e);}
   const old=level(S.xp);S.xp+=R.xp;R.levelUp=level(S.xp)>old;
   S.runs.unshift(R);if(S.runs.length>300)S.runs.length=300;
   S.active=null;lastPt=null;save();updateHud();closeSheet();onQuestChange();
@@ -912,7 +929,7 @@ function abortQuestUI(){
 }
 function questLine(){
   const R=S.active,l=R.locs[R.idx];
-  $('mhl').textContent=`Quest · ${R.idx+1}/${R.locs.length}`;
+  $('mhl').textContent=`${R.jlabel||'Quest'} · ${R.idx+1}/${R.locs.length}`;
   if(R.phase==='travel'){$('mt').textContent='Travel to '+l.name;$('md').textContent=fmtD(dist(player,l));}
   else{$('mt').textContent='Tasks at '+l.name;$('md').textContent=l.tasks.filter(t=>t.doneAt).length+'/'+l.tasks.length;}
 }
@@ -1008,7 +1025,7 @@ function runItemHTML(r){
     ${open?`<div class="rbody">${runDetailHTML(r)}<div class="qrow"><button class="btn ghost sm" data-act="delrun" data-id="${r.id}">Delete session</button></div></div>`:''}</div>`;
 }
 function listHTML(){
-  const R=S.active;let h='';
+  const R=S.active;let h=tabsHTML('q');
   if(R){
     const st=runStats(R),l=R.locs[R.idx];
     h+=`<div class="qa"><div class="qsub">Active quest · ${esc(R.name)}</div>
@@ -1054,14 +1071,17 @@ function doneHTML(){
   const r=S.runs.find(x=>x.id===QV.runId);if(!r)return listHTML();
   return `<div class="qsub">${esc(r.name)}</div><div class="qbig">Complete</div>
     <div class="qsub" style="margin-top:6px">+${r.xp} XP${r.levelUp?' · level up':''}</div>
-    ${runDetailHTML(r)}<div class="qrow"><button class="btn" data-act="list" style="flex:1">Done</button></div>`;
+    ${r.jnote?`<div class="qsub" style="margin-top:10px;color:var(--gold)">${esc(r.jnote)}</div>`:''}${runDetailHTML(r)}<div class="qrow"><button class="btn" data-act="list" style="flex:1">Done</button></div>`;
 }
 function renderQD(){
   if(QV.view==='edit'&&!ED)QV={view:'list'};
   if(QV.view==='done'&&!S.runs.find(x=>x.id===QV.runId))QV={view:'list'};
   const changed=renderQD.last!==QV.view;renderQD.last=QV.view;
-  $('qdT').textContent=QV.view==='edit'?(ED.isNew?'New quest':'Edit quest'):QV.view==='done'?'Quest complete':'Quests';
-  $('qdB').innerHTML=QV.view==='edit'?editHTML():QV.view==='done'?doneHTML():listHTML();
+  if(QV.view==='jedit'&&(!JED||!SIM)){JED=null;QV={view:'journeys'};}
+  if(QV.view==='jview'&&!S.journeys.find(x=>x.id===QV.jid))QV={view:'journeys'};
+  const V=QV.view;
+  $('qdT').textContent=V==='edit'?(ED.isNew?'New quest':'Edit quest'):V==='done'?'Quest complete':V==='jedit'?(JED.isNew?'New journey':'Edit journey'):(V==='journeys'||V==='jview')?'Journeys':'Quests';
+  $('qdB').innerHTML=V==='edit'?editHTML():V==='done'?doneHTML():V==='jedit'?jeditHTML():V==='jview'?jviewHTML():V==='journeys'?journeysHTML():listHTML();
   if(changed)$('qdB').scrollTop=0;
   if(QV.focus){
     const [a,b]=QV.focus.split(':'),el=$('qdB').querySelector(`[data-f="task"][data-i="${a}"][data-j="${b}"]`);
@@ -1072,6 +1092,7 @@ function renderQD(){
 function openQuestDrawer(){renderQD();$('qd').classList.add('open');}
 $('bQuest').onclick=()=>{if(PICK)exitPick(false);openQuestDrawer();};
 $('qdX').onclick=()=>{
+  if(QV.view==='jedit'){if(jDirty()&&!confirm('Discard unsaved changes?'))return;JED=null;QV={view:'journeys'};renderQD();return;}
   if(QV.view==='edit'){
     if(edDirty()&&!confirm('Discard unsaved changes?'))return;
     dropEditor();renderQD();return;
@@ -1087,6 +1108,7 @@ $('qdB').addEventListener('input',e=>{
 });
 $('qdB').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  if(/^(j|tab)/.test(b.dataset.act)){jClick(b);return;}
   const a=b.dataset.act,i=+b.dataset.i,j=+b.dataset.j,id=b.dataset.id;
   const redraw=()=>{drawQuestMarkers();renderQD();};
   switch(a){
@@ -1100,7 +1122,7 @@ $('qdB').addEventListener('click',e=>{
     case 'delrun':if(confirm('Delete this session from your history?')){S.runs=S.runs.filter(r=>r.id!==id);openRuns.delete(id);save();renderQD();}break;
     case 'list':QV={view:'list'};renderQD();break;
     case 'export':{
-      const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),quests:S.quests,sessions:S.runs},null,2)],{type:'application/json'});
+      const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),quests:S.quests,journeys:S.journeys,journeyProgress:S.jprog,sessions:S.runs},null,2)],{type:'application/json'});
       const el=document.createElement('a');el.href=URL.createObjectURL(blob);el.download='wildwalk-quests.json';
       document.body.appendChild(el);el.click();el.remove();setTimeout(()=>URL.revokeObjectURL(el.href),4000);break;
     }
@@ -1113,6 +1135,7 @@ $('qdB').addEventListener('click',e=>{
     case 'pick':if(ED)enterPick();break;
     case 'save':saveQuest();break;
     case 'delq':
+      if(ED&&S.journeys.some(j=>j.nodes.some(n=>n.questId===ED.q.id))){toast('Used in a journey<small>Remove it from the journey first</small>');break;}
       if(ED&&confirm(`Delete "${ED.q.name||'this quest'}"? Past sessions are kept.`)){
         S.quests=S.quests.filter(x=>x.id!==ED.q.id);save();dropEditor();renderQD();toast('Quest deleted');
       }
@@ -1131,6 +1154,185 @@ function saveQuest(){
   save();dropEditor();renderQD();
   toast(`Quest saved<small>${esc(q.name)} · ${q.locs.length} places · ${questTaskCount(q)} tasks</small>`,2600);
 }
+
+/* ================= Journeys: stitch quests into a golden path with side quests ================= */
+let JED=null;
+const jPad=n=>String(n).padStart(2,'0');
+const jById=(j,id)=>j.nodes.find(n=>n.id===id);
+const jMains=j=>j.nodes.filter(n=>n.kind==='main');
+const jKids=(j,id)=>j.nodes.filter(n=>n.kind==='side'&&n.unlocks===id);
+const jDone=j=>(S.jprog&&S.jprog[j.id])||{};
+const jQuest=n=>S.quests.find(x=>x.id===n.questId);
+const jName=n=>{const q=jQuest(n);return q?q.name:'Missing quest';};
+function jReqs(j,n){
+  const r=jKids(j,n.id).map(x=>x.id);
+  if(n.kind==='main'){const m=jMains(j),k=m.indexOf(n);if(k>0)r.unshift(m[k-1].id);}
+  return r;
+}
+function jState(j,n){
+  const d=jDone(j);if(d[n.id])return 'done';
+  if(!jQuest(n))return 'missing';
+  return jReqs(j,n).every(id=>d[id])?'open':'locked';
+}
+function jProg(j){
+  const d=jDone(j),m=jMains(j),s=j.nodes.filter(n=>n.kind==='side');
+  const dm=m.filter(n=>d[n.id]).length,ds=s.filter(n=>d[n.id]).length;
+  return {mains:m.length,doneMains:dm,sides:s.length,doneSides:ds,complete:m.length>0&&dm===m.length};
+}
+/* a side quest may unlock any other node, unless that would make a loop */
+function jTargets(j,x){
+  return j.nodes.filter(t=>{
+    if(t.id===x.id)return false;
+    let c=t,guard=0;
+    while(c&&c.kind==='side'&&guard++<50){if(c.unlocks===x.id)return false;c=jById(j,c.unlocks);}
+    return true;
+  });
+}
+function jDescendants(j,id){
+  const out=[];const walk=i=>jKids(j,i).forEach(k=>{out.push(k.id);walk(k.id);});walk(id);return out;
+}
+function jOpenSet(j){return new Set(j.nodes.filter(n=>jState(j,n)==='open').map(n=>n.id));}
+function jStart(jid,nid){
+  const j=S.journeys.find(x=>x.id===jid);if(!j)return;
+  const n=jById(j,nid);if(!n)return;
+  const st=jState(j,n);
+  if(st==='locked'){toast('Locked<small>Finish the required quests first</small>');return;}
+  if(st==='missing'){toast('This quest was deleted');return;}
+  const k=jMains(j).indexOf(n);
+  startQuest(n.questId,{jid:j.id,nid:n.id,jname:j.name,label:n.kind==='main'?'Stage '+(k+1):'Side quest'});
+}
+/* called when a quest run is finished: marks the journey node done and reports what it unlocked */
+function jOnFinish(R){
+  if(!R.journey)return;
+  const j=S.journeys.find(x=>x.id===R.journey.jid);if(!j||!jById(j,R.journey.nid))return;
+  const was=jDone(j)[R.journey.nid],before=jOpenSet(j),pBefore=jProg(j);
+  if(!S.jprog)S.jprog={};
+  if(!S.jprog[j.id])S.jprog[j.id]={};
+  if(!was)S.jprog[j.id][R.journey.nid]=R.id;
+  const after=jOpenSet(j),nu=[...after].filter(id=>!before.has(id)).map(id=>jName(jById(j,id)));
+  const pa=jProg(j);
+  let note=`Journey · ${j.name}`;
+  if(!was&&pa.complete&&!pBefore.complete){R.xp+=150;note+=' · journey complete · +150 XP bonus';}
+  else if(nu.length)note+=' · unlocked: '+nu.join(', ');
+  else if(was)note+=' · already cleared';
+  R.jnote=note;
+}
+
+/* --- drawer views --- */
+const tabsHTML=on=>`<div class="tabs"><button data-act="tabq" class="${on==='q'?'on':''}">Quests</button><button data-act="tabj" class="${on==='j'?'on':''}">Journeys</button></div>`;
+function journeysHTML(){
+  let h=tabsHTML('j');
+  if(SIM)h+=`<div class="qrow"><button class="btn sm" data-act="jnew" style="flex:1">+ New journey</button></div>`;
+  h+=`<div class="qh3">Journeys</div>`;
+  if(!S.journeys.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No journeys yet. Tap New journey to chain your quests into a golden path.':'No journeys yet. Turn on Sim to create one.'}</div>`;
+  S.journeys.forEach(j=>{
+    const p=jProg(j),pct=p.mains?Math.round(p.doneMains/p.mains*100):0;
+    h+=`<div class="qc jc"><div class="qch"><b>${esc(j.name)}</b></div>
+      <div class="qsub" style="margin-top:6px">${p.mains} stages · ${p.sides} side quests${p.complete?' · complete':''}</div>
+      <div class="qsub">Golden path ${p.doneMains}/${p.mains}${p.sides?` · side ${p.doneSides}/${p.sides}`:''}</div>
+      <div class="pb gold"><i style="width:${pct}%"></i></div>
+      <div class="qrow"><button class="btn sm" data-act="jopen" data-id="${j.id}">Open</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div></div>`;
+  });
+  return h;
+}
+function jNodeHTML(j,n,depth,k){
+  const st=jState(j,n),q=jQuest(n),d=jDone(j),R=S.active;
+  const reqs=jReqs(j,n).filter(id=>!d[id]).map(id=>jName(jById(j,id)));
+  const kids=jKids(j,n.id);
+  const chip={done:'CLEARED',open:'AVAILABLE',locked:'LOCKED',missing:'MISSING'}[st];
+  let h=`<div class="jn ${n.kind} ${st}" style="margin-left:${depth*14}px">
+    <div class="jh"><span class="idx jx">${n.kind==='main'?'STAGE '+jPad(k+1):'SIDE'}</span><span class="tag">${chip}</span></div>
+    <b class="jq">${esc(jName(n))}</b>
+    <div class="qsub" style="margin-top:6px">${q?`${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}`:'This quest was deleted'}</div>`;
+  if(st==='locked')h+=`<div class="qsub" style="margin-top:4px">Requires: ${esc(reqs.join(' · '))}</div>`;
+  if(st==='open'||st==='done')h+=`<div class="qrow"><button class="btn sm${st==='done'?' ghost':''}" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>${st==='done'?'Replay':'Start'}</button></div>`;
+  h+='</div>';
+  if(kids.length){
+    h+=`<div class="jlbl" style="margin-left:${depth*14+4}px">Required first</div>`;
+    kids.forEach(c=>{h+=jNodeHTML(j,c,depth+1);});
+  }
+  return h;
+}
+function jviewHTML(){
+  const j=S.journeys.find(x=>x.id===QV.jid);if(!j)return journeysHTML();
+  const p=jProg(j),pct=p.mains?Math.round(p.doneMains/p.mains*100):0;
+  let h=`<div class="qrow" style="margin-top:0"><button class="btn ghost sm" data-act="jback">← Journeys</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div>`;
+  h+=`<div class="qbig" style="font-size:22px;letter-spacing:.2em">${esc(j.name)}</div>
+    <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Golden path ${p.doneMains}/${p.mains}${p.sides?` · side quests ${p.doneSides}/${p.sides}`:''}</div>
+    <div class="pb gold"><i style="width:${pct}%"></i></div>`;
+  jMains(j).forEach((m,k)=>{h+=jNodeHTML(j,m,0,k);});
+  h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="jreset" data-id="${j.id}">Reset progress</button></div>`;
+  return h;
+}
+function jnodeEditHTML(j,n,depth,k){
+  const qopts=S.quests.map(q=>`<option value="${q.id}"${q.id===n.questId?' selected':''}>${esc(q.name)}</option>`).join('');
+  let h=`<div class="jn ${n.kind} edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${n.kind==='main'?'STAGE '+jPad(k+1):'SIDE'}</span>`;
+  if(n.kind==='main'){const m=jMains(j);h+=`<div class="mini"><button data-act="jup" data-n="${n.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${k<m.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div>`;}
+  else h+=`<div class="mini"><button data-act="jdel" data-n="${n.id}">×</button></div>`;
+  h+=`</div><select class="qi sel" data-f="jq" data-n="${n.id}">${qopts}</select>`;
+  if(n.kind==='side'){
+    const topts=jTargets(j,n).map(t=>{const lab=(t.kind==='main'?'Stage '+jPad(jMains(j).indexOf(t)+1):'Side')+' · '+jName(t);return `<option value="${t.id}"${t.id===n.unlocks?' selected':''}>${esc(lab)}</option>`;}).join('');
+    h+=`<div class="qsub" style="margin-top:8px">Required to unlock</div><select class="qi sel" data-f="jt" data-n="${n.id}">${topts}</select>`;
+  }
+  h+=`<div class="qrow"><button class="btn ghost sm" data-act="jside" data-n="${n.id}">+ Side quest</button></div></div>`;
+  jKids(j,n.id).forEach(c=>{h+=jnodeEditHTML(j,c,depth+1);});
+  return h;
+}
+function jeditHTML(){
+  const j=JED.j;
+  let h=`<input class="qi name" id="jName" placeholder="Journey name" maxlength="60" value="${esc(j.name)}">`;
+  h+=`<div class="qsub" style="margin-top:8px">Golden path: quests in order. Side quests are required to unlock a stage or another side quest.</div>`;
+  jMains(j).forEach((m,k)=>{h+=jnodeEditHTML(j,m,0,k);});
+  h+=`<div class="qrow"><button class="btn${jMains(j).length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
+  h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
+  return h;
+}
+const jDirty=()=>JED&&JSON.stringify(JED.j)!==JED.snap;
+function jOpenEditor(j,isNew){JED={j,isNew,snap:JSON.stringify(j)};QV={view:'jedit'};renderQD();$('qd').classList.add('open');}
+function jSave(){
+  const j=JED.j;j.name=(j.name||'').trim();
+  if(!j.name){toast('Name your journey');const n=$('jName');if(n)n.focus();return;}
+  if(!jMains(j).length){toast('Add at least one stage');return;}
+  if(j.nodes.some(n=>!jQuest(n))){toast('Every stage needs a quest');return;}
+  const k=S.journeys.findIndex(x=>x.id===j.id);
+  if(k>=0)S.journeys[k]=j;else S.journeys.push(j);
+  save();JED=null;QV={view:'jview',jid:j.id};renderQD();
+  toast(`Journey saved<small>${esc(j.name)} · ${jMains(j).length} stages</small>`,2400);
+}
+function jClick(b){
+  const a=b.dataset.act,id=b.dataset.id,nid=b.dataset.n;
+  switch(a){
+    case 'tabq':QV={view:'list'};renderQD();break;
+    case 'tabj':QV={view:'journeys'};renderQD();break;
+    case 'jback':QV={view:'journeys'};renderQD();break;
+    case 'jopen':QV={view:'jview',jid:id};renderQD();break;
+    case 'jstart':jStart(id,nid);break;
+    case 'jreset':if(confirm('Reset progress on this journey?')){if(S.jprog)delete S.jprog[id];save();renderQD();}break;
+    case 'jnew':if(SIM){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),nodes:[]},true);}break;
+    case 'jedit':{const j=S.journeys.find(x=>x.id===id);if(SIM&&j)jOpenEditor(clone(j),false);break;}
+    /* editor */
+    case 'jstage':if(JED){JED.j.nodes.push({id:qid(),kind:'main',questId:S.quests[0].id,unlocks:null});renderQD();}break;
+    case 'jside':if(JED){JED.j.nodes.push({id:qid(),kind:'side',questId:S.quests[0].id,unlocks:nid});renderQD();}break;
+    case 'jdel':if(JED){
+      const j=JED.j,n=jById(j,nid);if(!n)break;
+      if(n.kind==='main'){const gone=new Set([nid,...jDescendants(j,nid)]);j.nodes=j.nodes.filter(x=>!gone.has(x.id));}
+      else{jKids(j,nid).forEach(c=>{c.unlocks=n.unlocks;});j.nodes=j.nodes.filter(x=>x.id!==nid);}
+      renderQD();}break;
+    case 'jup':case 'jdown':if(JED){
+      const j=JED.j,m=jMains(j),k=m.findIndex(x=>x.id===nid),o=m[k+(a==='jup'?-1:1)];
+      if(o){const A=j.nodes.indexOf(m[k]),B=j.nodes.indexOf(o);[j.nodes[A],j.nodes[B]]=[j.nodes[B],j.nodes[A]];renderQD();}}break;
+    case 'jsave':if(JED)jSave();break;
+    case 'jdelj':if(JED&&confirm(`Delete "${JED.j.name||'this journey'}"?`)){
+      S.journeys=S.journeys.filter(x=>x.id!==JED.j.id);if(S.jprog)delete S.jprog[JED.j.id];save();JED=null;QV={view:'journeys'};renderQD();toast('Journey deleted');}break;
+  }
+}
+$('qdB').addEventListener('input',e=>{if(JED&&e.target.id==='jName')JED.j.name=e.target.value;});
+$('qdB').addEventListener('change',e=>{
+  const t=e.target;if(!JED||!t.dataset.n)return;
+  const n=jById(JED.j,t.dataset.n);if(!n)return;
+  if(t.dataset.f==='jq')n.questId=t.value;else if(t.dataset.f==='jt')n.unlocks=t.value;
+  renderQD();
+});
 
 /* ================= Orbit cinematic: map to space ================= */
 const ZH=3.6, FOV=30*Math.PI/180;
