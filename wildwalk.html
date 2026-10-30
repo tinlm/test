@@ -184,6 +184,21 @@
   .jq{font:500 16px var(--sans);letter-spacing:.12em;text-transform:uppercase}
   .jlbl{margin-top:8px;font:400 9px var(--mono);letter-spacing:.24em;color:var(--muted);text-transform:uppercase}
   select.qi.sel{font-size:14px;letter-spacing:.06em;background:#000;border:1px solid var(--line);padding:10px 8px;-webkit-appearance:none;appearance:none}
+  .ret.pfb2{}
+  .pf{position:fixed;inset:0;z-index:1700;background:#000d;display:none;align-items:center;justify-content:center;padding:20px}
+  .pf.open{display:flex}
+  .pfb{width:100%;max-width:420px;max-height:80vh;overflow:auto;background:#000;border:1px solid #fff;padding:18px}
+  .pfb h2{font:500 20px var(--sans);letter-spacing:.2em;text-transform:uppercase;margin:6px 0 12px}
+  .pfi{display:flex;gap:8px;align-items:stretch;margin-top:8px}
+  .pfi .pn{flex:1;min-width:0;text-align:left;background:#07090c;border:1px solid var(--line);color:var(--text);padding:13px 12px;font:500 14px var(--sans);letter-spacing:.1em;text-transform:uppercase}
+  .pfi .pn small{display:block;font:400 9px var(--mono);letter-spacing:.16em;color:var(--muted);margin-top:4px}
+  .pfi.cur .pn{border-color:#fff}
+  .pfi .px{width:44px;background:transparent;border:1px solid var(--line);color:var(--text);font-size:16px}
+  .jopt{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .jopt label,.jgrid label{display:block;font:400 9px var(--mono);letter-spacing:.18em;color:var(--muted);text-transform:uppercase}
+  .jgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px}
+  .qi.num{font-size:15px;padding:7px 2px}
+  .jw{margin-top:4px;color:#c9a35a}
   .pickbar{position:absolute;left:10px;right:10px;bottom:70px;z-index:1100;display:none;align-items:center;gap:8px;background:#000e;border:1px solid #fff;padding:8px 10px}
   .pickbar.on{display:flex}
   .pickbar span{flex:1;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
@@ -239,7 +254,7 @@
 <div class="corner c1"></div><div class="corner c2"></div><div class="corner c3"></div><div class="corner c4"></div>
 
 <div id="orbit">
-  <div class="lbar lt"><span>Wildwalk</span><span>Orbital view</span></div>
+  <div class="lbar lt"><span>Wildwalk</span><button class="ret" id="pfBtn">Orbital view</button></div>
   <div class="cap">Low Earth orbit</div>
   <div class="lbar lb"><div class="tel"><span>ALT <b id="alt">0 M</b></span><span>VEL <b id="vel">0.00 KM/S</b></span></div><button class="ret" id="ret">Return</button></div>
   <div class="credit">Map data © OpenStreetMap contributors · OpenFreeMap</div>
@@ -266,6 +281,12 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="pf" id="pf"><div class="pfb">
+  <div class="qsub">Who is playing</div>
+  <h2>Switch profile</h2>
+  <div id="pfL"></div>
+  <div class="qrow"><button class="btn ghost sm" id="pfNew">+ New player</button><button class="btn ghost sm" id="pfX">Close</button></div>
+</div></div>
 
 <div class="pickbar" id="pickbar"><span id="pickTxt">Tap the map to add places</span><button id="pickUndo">Undo</button><button class="go" id="pickDone">Done</button></div>
 
@@ -335,11 +356,30 @@ const RNAME={1:'Common',2:'Uncommon',3:'Rare',4:'Epic'};
 const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 
 /* ================= State ================= */
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,quests:[],runs:[],active:null,journeys:[],jprog:{}};
-let S=Object.assign({},def,JSON.parse(localStorage.getItem(LS)||'{}'));
+const LSC='wildwalk.content',LSP='wildwalk.players';
+const CKEYS=['quests','journeys','items'];            // shared by everyone: what the developer builds
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,runs:[],active:null,jprog:{},jat:{},jstart:{}};
+const readJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+let PS=readJSON(LSP),CT=readJSON(LSC);
+if(!PS||!CT){   // first launch of this version: the old single save becomes the developer profile
+  const old=readJSON(LS)||{};
+  CT={quests:old.quests||[],journeys:old.journeys||[],items:[]};
+  const st=Object.assign({},old);CKEYS.forEach(k=>delete st[k]);
+  PS={cur:'dev',list:[{id:'dev',name:'Developer',state:st}]};
+}
+if(!PS.list.find(x=>x.id==='dev'))PS.list.unshift({id:'dev',name:'Developer',state:{}});
+let CUR=PS.list.find(x=>x.id===PS.cur)||PS.list[0];
+const DEV=CUR.id==='dev';    // developer mode: editors are available. Player mode: you just play your own progress.
+let S=Object.assign({},def,{quests:[],journeys:[],items:[]},CT,CUR.state);
 let SIM=false;   // not saved: every launch starts on real GPS
 let PICK=false,ED=null,QV={view:'list'};   // quest editor: picking places on the map / draft quest / drawer view
-const save=()=>localStorage.setItem(LS,JSON.stringify(S));
+function save(){
+  const c={},st={};
+  for(const k in S)(CKEYS.includes(k)?c:st)[k]=S[k];
+  CUR.state=st;PS.cur=CUR.id;
+  try{localStorage.setItem(LSC,JSON.stringify(c));localStorage.setItem(LSP,JSON.stringify(PS));}
+  catch(e){console.warn('save failed',e);if(!save.warned){save.warned=1;setTimeout(()=>{try{toast('Storage is full<small>Remove some item pictures</small>',4000);}catch(_){}},0);}}
+}
 const $=id=>document.getElementById(id);
 const level=x=>Math.floor(Math.sqrt(x/100))+1;
 const lvStart=l=>(l-1)*(l-1)*100;
@@ -479,7 +519,7 @@ const me=mkMarker('<div class="me"></div>',player.lng,player.lat,null,10);
 try{(me.getElement?me.getElement():me.el).classList.add('mme');}catch(e){}
 const youEl=document.createElement('div');youEl.id='you';youEl.innerHTML='<div class="me" style="position:absolute;left:-7px;top:-7px"></div>';document.body.appendChild(youEl);
 
-function setReadout(){$('mode').textContent=S.active?fmtT(Date.now()-S.active.startedAt)+(SIM?' · SIM':''):(SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING'));}
+function setReadout(){$('mode').textContent=(DEV?'DEV · ':'')+(S.active?fmtT(Date.now()-S.active.startedAt)+(SIM?' · SIM':''):(SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING')));}
 function setPlayer(lat,lng,pan){
   player={lat,lng};
   me.mk.setLngLat([lng,lat]);
@@ -781,7 +821,7 @@ function renderDex(){
 }
 $('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
 $('dexX').onclick=()=>$('dex').classList.remove('open');
-$('reset').onclick=()=>{if(confirm('Reset all progress?\nYour saved quests and journeys are kept. Session history is cleared.')){localStorage.setItem(LS,JSON.stringify({quests:S.quests,journeys:S.journeys}));location.reload();}};
+$('reset').onclick=()=>{if(confirm(`Reset progress for ${CUR.name}?\nQuests, journeys and items are kept. This profile starts over.`)){CUR.state={};PS.cur=CUR.id;localStorage.setItem(LSP,JSON.stringify(PS));location.reload();}};
 $('bLoc').onclick=()=>{document.body.dataset.follow='1';map.easeTo({center:[player.lng,player.lat],zoom:Math.max(map.getZoom(),17),duration:600});};
 
 function setSim(on){
@@ -1033,15 +1073,15 @@ function listHTML(){
       <div class="qsub">Place ${R.idx+1}/${R.locs.length} · ${st.done}/${st.tasks} tasks · ${fmtT(st.dur)}</div>
       <div class="qrow"><button class="btn sm" data-act="${R.phase==='tasks'?'sheet':'focus'}">${R.phase==='tasks'?'Open checklist':'Show on map'}</button><button class="btn ghost sm" data-act="abort">Abort quest</button></div></div>`;
   }
-  if(SIM)h+=`<div class="qrow"><button class="btn sm" data-act="new" style="flex:1">+ New quest</button></div>`;
+  if(DEV)h+=`<div class="qrow"><button class="btn sm" data-act="new" style="flex:1">+ New quest</button></div>`;
   h+=`<div class="qh3">Quests</div>`;
-  if(!S.quests.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No quests yet. Tap New quest to build one.':'No quests yet. Turn on Sim to create one.'}</div>`;
+  if(!S.quests.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${DEV?'No quests yet. Tap New quest to build one.':'No quests yet. A developer builds them (switch in Orbit).'}</div>`;
   S.quests.forEach(q=>{
     const st=questStats(q);
     h+=`<div class="qc"><div class="qch"><b>${esc(q.name)}</b></div>
       <div class="qsub" style="margin-top:6px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>
       <div class="qsub">${st.runs?`Runs ${st.runs} · completed ${st.done}${st.best!=null?' · best '+fmtT(st.best):''}`:'Not run yet'}</div>
-      <div class="qrow"><button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button>${SIM?`<button class="btn ghost sm" data-act="edit" data-id="${q.id}">Edit</button>`:''}</div></div>`;
+      <div class="qrow"><button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button>${DEV?`<button class="btn ghost sm" data-act="edit" data-id="${q.id}">Edit</button>`:''}</div></div>`;
   });
   h+=`<div class="qh3">Sessions</div>`;
   if(!S.runs.length)h+=`<div class="qsub" style="margin-top:8px">Every quest you start is logged here.</div>`;
@@ -1077,7 +1117,7 @@ function renderQD(){
   if(QV.view==='edit'&&!ED)QV={view:'list'};
   if(QV.view==='done'&&!S.runs.find(x=>x.id===QV.runId))QV={view:'list'};
   const changed=renderQD.last!==QV.view;renderQD.last=QV.view;
-  if(QV.view==='jedit'&&(!JED||!SIM)){JED=null;QV={view:'journeys'};}
+  if(QV.view==='jedit'&&(!JED||!DEV)){JED=null;QV={view:'journeys'};}
   if(QV.view==='jview'&&!S.journeys.find(x=>x.id===QV.jid))QV={view:'journeys'};
   const V=QV.view;
   $('qdT').textContent=V==='edit'?(ED.isNew?'New quest':'Edit quest'):V==='done'?'Quest complete':V==='jedit'?(JED.isNew?'New journey':'Edit journey'):(V==='journeys'||V==='jview')?'Journeys':'Quests';
@@ -1112,8 +1152,8 @@ $('qdB').addEventListener('click',e=>{
   const a=b.dataset.act,i=+b.dataset.i,j=+b.dataset.j,id=b.dataset.id;
   const redraw=()=>{drawQuestMarkers();renderQD();};
   switch(a){
-    case 'new':if(SIM)openEditor({id:qid(),name:'',createdAt:Date.now(),locs:[]},true);break;
-    case 'edit':{const q=S.quests.find(x=>x.id===id);if(SIM&&q)openEditor(clone(q),false);break;}
+    case 'new':if(DEV)openEditor({id:qid(),name:'',createdAt:Date.now(),locs:[]},true);break;
+    case 'edit':{const q=S.quests.find(x=>x.id===id);if(DEV&&q)openEditor(clone(q),false);break;}
     case 'start':startQuest(id);break;
     case 'focus':$('qd').classList.remove('open');focusTarget();break;
     case 'sheet':$('qd').classList.remove('open');openSheet();break;
@@ -1155,7 +1195,7 @@ function saveQuest(){
   toast(`Quest saved<small>${esc(q.name)} · ${q.locs.length} places · ${questTaskCount(q)} tasks</small>`,2600);
 }
 
-/* ================= Journeys: a golden path of stages, each gated by an ordered tree of side quests ================= */
+/* ================= Journeys: a golden path of stages, each gated by a tree of side quests (free or ordered) and optional limits ================= */
 /* journey = {id,name,stages:[{id,questId,gate:[side]}]}   side = {id,questId,subs:[side]}
    Play order is depth-first: a side quest's sub-quests come first, then the side quest itself, then the next side quest in the
    gate, and when the gate is finished the stage opens. The whole journey is one strict line: only the first unfinished step is open. */
@@ -1173,14 +1213,61 @@ function jSeq(j){
   j.stages.forEach((st,si)=>{st.gate.forEach(g=>walk(g,'side',0,si));walk(st,'stage',0,si);});
   return out.map((e,i)=>Object.assign(e,{step:i+1}));
 }
-function jNext(j){const d=jDone(j);return jSeq(j).find(e=>!d[e.n.id]&&jQuest(e.n))||null;}
-function jState(j,n){
-  const d=jDone(j);
-  if(d[n.id])return 'done';
-  if(!jQuest(n))return 'missing';
-  const nx=jNext(j);
-  return nx&&nx.n.id===n.id?'open':'locked';
+
+/* node helpers: stages hold a "gate" of side quests, side quests hold "subs". children can be done in any order ('free') or in sequence ('seq') */
+const jKidsOf=n=>n.gate||n.subs||[];
+const jOrd=n=>n.order==='free'?'free':'seq';
+function jCond(n){return Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond||{});}
+function jIdx(j){
+  const m={};
+  j.stages.forEach((st,si)=>{
+    m[st.id]={n:st,kind:'stage',parent:null,arr:j.stages,i:si,si};
+    const walk=(arr,parent,depth)=>arr.forEach((n,i)=>{m[n.id]={n,kind:'side',parent,arr,i,si,depth};walk(n.subs,n,depth+1);});
+    walk(st.gate,st,0);
+  });
+  return m;
 }
+const jTouch=j=>{if(!S.jstart)S.jstart={};if(!S.jstart[j.id]){S.jstart[j.id]=Date.now();save();}return S.jstart[j.id];};
+/* what stands between the player and this step: [] means it is open */
+function jWhy(j,n,m){
+  m=m||jIdx(j);const e=m[n.id],d=jDone(j),why=[];
+  if(!e)return why;
+  /* is the branch reachable at all? the previous stage / earlier siblings (in sequence) must be done */
+  let c=e,block=null;
+  while(c&&!block){
+    if(c.kind==='stage'){if(c.i>0&&!d[j.stages[c.i-1].id])block=j.stages[c.i-1];break;}
+    if(jOrd(c.parent)==='seq'&&c.i>0&&!d[c.arr[c.i-1].id]){block=c.arr[c.i-1];break;}
+    c=m[c.parent.id];
+  }
+  if(block)why.push('Finish first: '+(block.gate?'Stage '+jPad(j.stages.indexOf(block)+1)+' · ':'')+jName(block));
+  const open=jKidsOf(n).filter(k=>!d[k.id]);
+  if(open.length)why.push((jOrd(n)==='free'?'Do first (any order): ':'Do first: ')+open.map(jName).join(', '));
+  const c0=jCond(n),xp=S.xp||0;
+  if(c0.lvl>0&&level(xp)<c0.lvl)why.push(`Reach level ${c0.lvl}`);
+  if(c0.xp>0&&xp<c0.xp)why.push(`Earn ${c0.xp} XP total`);
+  if(c0.wait>0){
+    const jt=S.jat&&S.jat[j.id]||{};
+    let t0=jTouch(j);
+    if(c0.from==='prev'){
+      const pre=jKidsOf(n).map(k=>k.id);
+      if(e.kind==='stage'&&e.i>0)pre.push(j.stages[e.i-1].id);
+      if(e.kind==='side'&&e.i>0&&jOrd(e.parent)==='seq')pre.push(e.arr[e.i-1].id);
+      const ts=pre.map(i=>jt[i]).filter(Boolean);
+      if(ts.length)t0=Math.max(...ts);
+    }
+    const left=t0+c0.wait*60000-Date.now();
+    if(left>0)why.push('Unlocks in '+fmtWait(left));
+  }
+  return why;
+}
+const fmtWait=ms=>{const m=Math.ceil(ms/60000),d=Math.floor(m/1440),h=Math.floor(m%1440/60),mm=m%60;return d?`${d}d ${h}h`:h?`${h}h ${mm}m`:`${mm}m`;};
+function jState(j,n,m){
+  if(jDone(j)[n.id])return 'done';
+  if(!jQuest(n))return 'missing';
+  return jWhy(j,n,m).length?'locked':'open';
+}
+/* every step the player can start right now */
+function jAvail(j){const m=jIdx(j);return jSeq(j).filter(e=>jState(j,e.n,m)==='open');}
 function jProg(j){
   const d=jDone(j),sq=jSeq(j),st=sq.filter(e=>e.kind==='stage'),sd=sq.filter(e=>e.kind==='side');
   const ds=st.filter(e=>d[e.n.id]).length;
@@ -1191,7 +1278,7 @@ function jStart(jid,nid){
   const j=S.journeys.find(x=>x.id===jid);if(!j)return;
   const e=jSeq(j).find(x=>x.n.id===nid);if(!e)return;
   const st=jState(j,e.n);
-  if(st==='locked'){const nx=jNext(j);toast(`Locked<small>Finish "${esc(nx?jName(nx.n):'the earlier quest')}" first</small>`);return;}
+  if(st==='locked'){toast(`Locked<small>${esc(jWhy(j,e.n)[0]||'')}</small>`);return;}
   if(st==='missing'){toast('This quest was deleted');return;}
   startQuest(e.n.questId,{jid:j.id,nid:e.n.id,jname:j.name,label:e.kind==='stage'?'Stage '+(e.si+1):'Side quest'});
 }
@@ -1200,15 +1287,15 @@ function jOnFinish(R){
   if(!R.journey)return;
   const j=S.journeys.find(x=>x.id===R.journey.jid);if(!j)return;
   const e=jSeq(j).find(x=>x.n.id===R.journey.nid);if(!e)return;
-  const was=jDone(j)[e.n.id],pBefore=jProg(j);
-  if(!S.jprog)S.jprog={};
-  if(!S.jprog[j.id])S.jprog[j.id]={};
-  if(!was)S.jprog[j.id][e.n.id]=R.id;
-  const pa=jProg(j),nx=jNext(j);
+  const was=jDone(j)[e.n.id],pBefore=jProg(j),before=new Set(jAvail(j).map(x=>x.n.id));
+  if(!S.jprog)S.jprog={};if(!S.jprog[j.id])S.jprog[j.id]={};
+  if(!S.jat)S.jat={};if(!S.jat[j.id])S.jat[j.id]={};
+  if(!was){S.jprog[j.id][e.n.id]=R.id;S.jat[j.id][e.n.id]=Date.now();}
+  const pa=jProg(j),now=jAvail(j).filter(x=>!before.has(x.n.id)).map(x=>jName(x.n));
   let note=`Journey · ${j.name}`;
   if(!was&&pa.complete&&!pBefore.complete){R.xp+=150;note+=' · journey complete · +150 XP bonus';}
   else if(was)note+=' · already cleared';
-  else if(nx)note+=` · ${e.kind==='stage'?'stage cleared · ':''}next: ${jName(nx.n)}`;
+  else{if(e.kind==='stage')note+=' · stage cleared';note+=now.length?' · now available: '+now.join(', '):' · next step is locked, see the journey';}
   R.jnote=note;
 }
 
@@ -1216,45 +1303,49 @@ function jOnFinish(R){
 const tabsHTML=on=>`<div class="tabs"><button data-act="tabq" class="${on==='q'?'on':''}">Quests</button><button data-act="tabj" class="${on==='j'?'on':''}">Journeys</button></div>`;
 function journeysHTML(){
   let h=tabsHTML('j');
-  if(SIM)h+=`<div class="qrow"><button class="btn sm" data-act="jnew" style="flex:1">+ New journey</button></div>`;
+  if(DEV)h+=`<div class="qrow"><button class="btn sm" data-act="jnew" style="flex:1">+ New journey</button></div>`;
   h+=`<div class="qh3">Journeys</div>`;
-  if(!S.journeys.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${SIM?'No journeys yet. Tap New journey to build a golden path.':'No journeys yet. Turn on Sim to create one.'}</div>`;
+  if(!S.journeys.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${DEV?'No journeys yet. Tap New journey to build a golden path.':'No journeys yet. A developer builds them (switch in Orbit).'}</div>`;
   S.journeys.forEach(j=>{
     const p=jProg(j),pct=p.total?Math.round(p.done/p.total*100):0;
     h+=`<div class="qc jc"><div class="qch"><b>${esc(j.name)}</b></div>
       <div class="qsub" style="margin-top:6px">${p.mains} stages · ${p.sides} side quests${p.complete?' · complete':''}</div>
       <div class="qsub">Progress ${p.done}/${p.total}</div>
       <div class="pb gold"><i style="width:${pct}%"></i></div>
-      <div class="qrow"><button class="btn sm" data-act="jopen" data-id="${j.id}">Open</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div></div>`;
+      <div class="qrow"><button class="btn sm" data-act="jopen" data-id="${j.id}">Open</button>${DEV?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div></div>`;
   });
   return h;
 }
-function jCardHTML(j,e,nx){
-  const n=e.n,st=jState(j,n),q=jQuest(n),R=S.active;
-  const chip={done:'CLEARED',open:'AVAILABLE',locked:'LOCKED',missing:'MISSING'}[st];
+function jCardHTML(j,e,m){
+  const n=e.n,st=jState(j,n,m),q=jQuest(n),R=S.active,why=st==='locked'?jWhy(j,n,m):[];
+  const c=jCond(n),chip={done:'CLEARED',open:'AVAILABLE',locked:'LOCKED',missing:'MISSING'}[st];
   let h=`<div class="jn ${e.kind==='stage'?'main':'side'} ${st}" style="margin-left:${e.depth*14}px">
-    <div class="jh"><span class="idx jx">${e.kind==='stage'?'STAGE '+jPad(e.si+1):'SIDE'}</span><span class="tag">#${jPad(e.step)} · ${chip}</span></div>
+    <div class="jh"><span class="idx jx">${e.kind==='stage'?'STAGE '+jPad(e.si+1):'SIDE'}</span><span class="tag">${chip}</span></div>
     <b class="jq">${esc(jName(n))}</b>
     <div class="qsub" style="margin-top:6px">${q?`${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}`:'This quest was deleted'}</div>`;
-  if(st==='locked'&&nx)h+=`<div class="qsub" style="margin-top:4px">Finish first: ${esc(jName(nx.n))}</div>`;
+  if((c.lvl||c.xp||c.wait)&&st!=='done')h+=`<div class="qsub" style="margin-top:4px">Needs${c.lvl?' level '+c.lvl:''}${c.xp?' · '+c.xp+' XP':''}${c.wait?' · wait '+c.wait+' min '+(c.from==='prev'?'after the previous step':'after journey start'):''}</div>`;
+  why.forEach(w=>{h+=`<div class="qsub jw">${esc(w)}</div>`;});
   if(st==='open'||st==='done')h+=`<div class="qrow"><button class="btn sm${st==='done'?' ghost':''}" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>${st==='done'?'Replay':'Start'}</button></div>`;
   return h+'</div>';
 }
+function jBlockHTML(j,m,n,depth){
+  const e=m[n.id],ks=jKidsOf(n);let h='';
+  if(ks.length){
+    const cd=e.kind==='stage'?0:depth+1;
+    h+=`<div class="jlbl" style="margin-left:${cd*14+4}px">${e.kind==='stage'?'Needed to unlock stage '+jPad(e.si+1):'Needed first for '+esc(jName(n))} · ${jOrd(n)==='free'?'any order':'in order'}</div>`;
+    ks.forEach(c=>{h+=jBlockHTML(j,m,c,cd);});
+  }
+  return h+jCardHTML(j,Object.assign({},e,{depth}),m);
+}
 function jviewHTML(){
   const j=S.journeys.find(x=>x.id===QV.jid);if(!j)return journeysHTML();
-  const p=jProg(j),pct=p.total?Math.round(p.done/p.total*100):0,nx=jNext(j);
-  let h=`<div class="qrow" style="margin-top:0"><button class="btn ghost sm" data-act="jback">← Journeys</button>${SIM?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div>`;
+  const p=jProg(j),pct=p.total?Math.round(p.done/p.total*100):0,m=jIdx(j),av=jAvail(j);
+  let h=`<div class="qrow" style="margin-top:0"><button class="btn ghost sm" data-act="jback">← Journeys</button>${DEV?`<button class="btn ghost sm" data-act="jedit" data-id="${j.id}">Edit</button>`:''}</div>`;
   h+=`<div class="qbig" style="font-size:22px;letter-spacing:.2em">${esc(j.name)}</div>
-    <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Stages ${p.doneMains}/${p.mains} · side quests ${p.doneSides}/${p.sides}</div>
+    <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Stages ${p.doneMains}/${p.mains} · side quests ${p.doneSides}/${p.sides} · ${av.length} available now</div>
     <div class="pb gold"><i style="width:${pct}%"></i></div>`;
-  let lastSi=-1;
-  jSeq(j).forEach(e=>{
-    if(e.si!==lastSi){
-      lastSi=e.si;
-      const hasGate=j.stages[e.si].gate.length>0;
-      h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">${hasGate?`Side quests to unlock stage ${jPad(e.si+1)}`:`Stage ${jPad(e.si+1)}`}</div>`;
-    }
-    h+=jCardHTML(j,e,nx);
+  j.stages.forEach((st,k)=>{
+    h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`+jBlockHTML(j,m,st,0);
   });
   h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="jreset" data-id="${j.id}">Reset progress</button></div>`;
   return h;
@@ -1267,26 +1358,36 @@ function jFind(j,id){   // -> {arr,i} of the array that holds this side quest or
   walk(j.stages);return hit;
 }
 function jQOpts(sel){return S.quests.map(q=>`<option value="${q.id}"${q.id===sel?' selected':''}>${esc(q.name)}</option>`).join('');}
+function jOptsHTML(n){
+  const c=jCond(n),has=jKidsOf(n).length;
+  let h=`<div class="jopt">`;
+  if(has)h+=`<label>Needed first<select class="qi sel" data-f="jord" data-n="${n.id}"><option value="seq"${jOrd(n)==='seq'?' selected':''}>In order</option><option value="free"${jOrd(n)==='free'?' selected':''}>Any order (choice)</option></select></label>`;
+  h+=`<div class="jgrid"><label>Level ≥<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jlvl" data-n="${n.id}" value="${c.lvl||''}" placeholder="0"></label>
+    <label>Total XP ≥<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jxp" data-n="${n.id}" value="${c.xp||''}" placeholder="0"></label>
+    <label>Wait (min)<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jwait" data-n="${n.id}" value="${c.wait||''}" placeholder="0"></label>
+    <label>Wait counts from<select class="qi sel" data-f="jfrom" data-n="${n.id}"><option value="start"${c.from==='start'?' selected':''}>Journey start</option><option value="prev"${c.from==='prev'?' selected':''}>Previous step done</option></select></label></div></div>`;
+  return h;
+}
 function jSideEditHTML(j,n,depth,idx,len){
   let h='';
   n.subs.forEach((s,i)=>{h+=jSideEditHTML(j,s,depth+1,i,n.subs.length);});
   h+=`<div class="jn side edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${depth?'SUB':'SIDE'}</span>
     <div class="mini"><button data-act="jup" data-n="${n.id}"${idx?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${idx<len-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div></div>
-    <select class="qi sel" data-f="jq" data-n="${n.id}">${jQOpts(n.questId)}</select>
+    <select class="qi sel" data-f="jq" data-n="${n.id}">${jQOpts(n.questId)}</select>${jOptsHTML(n)}
     <div class="qrow"><button class="btn ghost sm" data-act="jsub" data-n="${n.id}">+ Sub-quest first</button></div></div>`;
   return h;
 }
 function jeditHTML(){
   const j=JED.j;
   let h=`<input class="qi name" id="jName" placeholder="Journey name" maxlength="60" value="${esc(j.name)}">`;
-  h+=`<div class="qsub" style="margin-top:8px;line-height:1.6">Top to bottom is the play order. Side quests gate the stage below them. A side quest's sub-quests must be done before it.</div>`;
+  h+=`<div class="qsub" style="margin-top:8px;line-height:1.6">Side quests gate the stage below them, and sub-quests gate their parent. Set each group to In order or Any order (the player's choice). Add limits like level, XP or waiting time on any step.</div>`;
   j.stages.forEach((st,k)=>{
     h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`;
     st.gate.forEach((g,i)=>{h+=jSideEditHTML(j,g,0,i,st.gate.length);});
     h+=`<div class="qrow" style="margin-top:8px"><button class="btn ghost sm" data-act="jgate" data-n="${st.id}">+ Side quest to unlock this stage</button></div>`;
     h+=`<div class="jn main edit"><div class="jh"><span class="idx jx">STAGE ${jPad(k+1)}</span>
       <div class="mini"><button data-act="jup" data-n="${st.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${st.id}"${k<j.stages.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${st.id}">×</button></div></div>
-      <select class="qi sel" data-f="jq" data-n="${st.id}">${jQOpts(st.questId)}</select></div>`;
+      <select class="qi sel" data-f="jq" data-n="${st.id}">${jQOpts(st.questId)}</select>${jOptsHTML(st)}</div>`;
   });
   h+=`<div class="qrow"><button class="btn${j.stages.length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
   h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
@@ -1315,13 +1416,13 @@ function jClick(b){
     case 'jback':QV={view:'journeys'};renderQD();break;
     case 'jopen':QV={view:'jview',jid:id};renderQD();break;
     case 'jstart':jStart(id,nid);break;
-    case 'jreset':if(confirm('Reset progress on this journey?')){if(S.jprog)delete S.jprog[id];save();renderQD();}break;
-    case 'jnew':if(SIM){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),stages:[]},true);}break;
-    case 'jedit':{const j=S.journeys.find(x=>x.id===id);if(SIM&&j)jOpenEditor(clone(j),false);break;}
+    case 'jreset':if(confirm('Reset progress on this journey?')){if(S.jprog)delete S.jprog[id];if(S.jat)delete S.jat[id];if(S.jstart)S.jstart[id]=Date.now();save();renderQD();}break;
+    case 'jnew':if(DEV){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),stages:[]},true);}break;
+    case 'jedit':{const j=S.journeys.find(x=>x.id===id);if(DEV&&j)jOpenEditor(clone(j),false);break;}
     /* editor */
-    case 'jstage':if(JED){JED.j.stages.push({id:qid(),questId:S.quests[0].id,gate:[]});renderQD();}break;
-    case 'jgate':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].gate.push({id:qid(),questId:S.quests[0].id,subs:[]});renderQD();}}break;
-    case 'jsub':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].subs.push({id:qid(),questId:S.quests[0].id,subs:[]});renderQD();}}break;
+    case 'jstage':if(JED){JED.j.stages.push({id:qid(),questId:S.quests[0].id,gate:[],order:'seq'});renderQD();}break;
+    case 'jgate':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].gate.push({id:qid(),questId:S.quests[0].id,subs:[],order:'seq'});renderQD();}}break;
+    case 'jsub':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].subs.push({id:qid(),questId:S.quests[0].id,subs:[],order:'seq'});renderQD();}}break;
     case 'jdel':if(JED){const f=jFind(JED.j,nid);if(f){
       const n=f.arr[f.i],cnt=n.gate?n.gate.length+1:(n.subs&&n.subs.length?n.subs.length+1:0);
       if(cnt>1&&!confirm('Delete this and everything nested under it?'))break;
@@ -1334,11 +1435,22 @@ function jClick(b){
       S.journeys=S.journeys.filter(x=>x.id!==JED.j.id);if(S.jprog)delete S.jprog[JED.j.id];save();JED=null;QV={view:'journeys'};renderQD();toast('Journey deleted');}break;
   }
 }
-$('qdB').addEventListener('input',e=>{if(JED&&e.target.id==='jName')JED.j.name=e.target.value;});
+$('qdB').addEventListener('input',e=>{
+  if(!JED)return;const t=e.target;
+  if(t.id==='jName'){JED.j.name=t.value;return;}
+  const f=t.dataset.f;if(!f||!t.dataset.n||!['jlvl','jxp','jwait'].includes(f))return;
+  const x=jFind(JED.j,t.dataset.n);if(!x)return;const n=x.arr[x.i];
+  n.cond=Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond);
+  n.cond[{jlvl:'lvl',jxp:'xp',jwait:'wait'}[f]]=Math.max(0,parseInt(t.value,10)||0);
+});
 $('qdB').addEventListener('change',e=>{
-  const t=e.target;if(!JED||t.dataset.f!=='jq')return;
-  const f=jFind(JED.j,t.dataset.n);if(!f)return;
-  f.arr[f.i].questId=t.value;renderQD();
+  const t=e.target;if(!JED||!t.dataset.f||!t.dataset.n)return;
+  const x=jFind(JED.j,t.dataset.n);if(!x)return;const n=x.arr[x.i],f=t.dataset.f;
+  if(f==='jq')n.questId=t.value;
+  else if(f==='jord')n.order=t.value;
+  else if(f==='jfrom')n.cond=Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond,{from:t.value});
+  else return;
+  renderQD();
 });
 /* first-release journeys (a flat list of nodes) are converted to the nested form */
 (function(){
@@ -1351,6 +1463,9 @@ $('qdB').addEventListener('change',e=>{
   });
   if(ch)save();
 })();
+
+
+S.journeys.forEach(j=>{if(!S.jstart||!S.jstart[j.id]){if(!S.jstart)S.jstart={};S.jstart[j.id]=Date.now();}});
 
 /* ================= Orbit cinematic: map to space ================= */
 const ZH=3.6, FOV=30*Math.PI/180;
@@ -1695,6 +1810,32 @@ function finishOrbit(){
   if(fallbackGlobe){map.setProjection({type:'mercator'});fallbackGlobe=false;}
   showLabels();updateSat();
 }
+/* --- profiles: switch between the developer and the players (from orbit) --- */
+function profLabel(){return DEV?'Developer':'Player · '+CUR.name;}
+function renderProf(){
+  $('pfBtn').textContent=profLabel();
+  $('pfL').innerHTML=PS.list.map(x=>{
+    const st=x.state||{},xp=st.xp||0;
+    return `<div class="pfi${x.id===CUR.id?' cur':''}"><button class="pn" data-p="${x.id}">${x.id==='dev'?'Developer':esc(x.name)}<small>${x.id==='dev'?'Create quests, journeys and items':`Level ${level(xp)} · ${xp} XP`}</small></button>${x.id==='dev'?'':`<button class="px" data-d="${x.id}" aria-label="Delete player">×</button>`}</div>`;
+  }).join('');
+}
+function switchProfile(id){
+  if(id===CUR.id){$('pf').classList.remove('open');return;}
+  save();PS.cur=id;localStorage.setItem(LSP,JSON.stringify(PS));location.reload();
+}
+$('pfBtn').onclick=()=>{renderProf();$('pf').classList.add('open');};
+$('pfX').onclick=()=>$('pf').classList.remove('open');
+$('pfNew').onclick=()=>{
+  const n=(prompt('Name the new player')||'').trim().slice(0,24);if(!n)return;
+  const id='p'+Date.now().toString(36);
+  PS.list.push({id,name:n,state:{}});save();switchProfile(id);
+};
+$('pfL').addEventListener('click',e=>{
+  const d=e.target.closest('[data-d]');
+  if(d){const x=PS.list.find(v=>v.id===d.dataset.d);if(x&&confirm(`Delete player "${x.name}" and all their progress?`)){PS.list=PS.list.filter(v=>v.id!==x.id);save();renderProf();}return;}
+  const b=e.target.closest('[data-p]');if(b)switchProfile(b.dataset.p);
+});
+renderProf();
 $('bOrbit').onclick=startOrbit;
 $('ret').onclick=endOrbit;
 
