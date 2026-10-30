@@ -670,6 +670,7 @@ function openCatch(pin){
   $('cTip').textContent=item?'Throw when the ring meets the dashed circle':'Throw when the ring meets the dashed circle to start the quest';
   $('target').style.width=$('target').style.height=TARGET_R*2+'px';
   $('catch').classList.add('open');startRing();updateHud();
+  if(S.orbs<=0)$('cTip').textContent='No orbs left. Find a supply cache or a stop.';
 }
 function startRing(){
   cancelAnimationFrame(raf);const t0=performance.now();
@@ -680,6 +681,10 @@ function startRing(){
 }
 function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
 $('runBtn').onclick=closeCatch;
+function nearestSupply(){
+  const now=Date.now(),pool=stops.filter(s=>(S.stopCd[s.id]||0)<now-STOP_COOLDOWN).concat(suppliesAround(player,now));
+  return pool.map(s=>({s,d:dist(player,s)})).sort((a,b)=>a.d-b.d)[0]||null;
+}
 function revealItem(it,xp,isNew){
   $('qpI').innerHTML=it.img?`<img alt="" src="${it.img}">`:`<span>${esc(it.icon||'◆')}</span>`;$('qpI').style.display='flex';
   $('qpE').textContent=isNew?'Item collected':'Item';
@@ -691,8 +696,8 @@ function revealItem(it,xp,isNew){
 $('throwBtn').onclick=()=>{
   if(!cur)return;
   const pin=cur.pin,item=pin.kind==='item';
-  if(item&&S.orbs<=0){toast('Out of orbs<small>Visit a stop or supply cache to resupply</small>',2600);closeCatch();return;}
-  if(S.orbs>0)S.orbs--;      // starting a quest uses an orb when you have one, but never blocks you without
+  if(S.orbs<=0){const n=nearestSupply();toast(`Out of orbs<small>${n?'Nearest supply '+fmtD(n.d)+' away':'Visit a stop or supply cache'}</small>`,3200);closeCatch();return;}
+  S.orbs--;
   const off=Math.abs(ringR-TARGET_R);
   if(off<=cur.tol){
     const great=off<=cur.tol/3;
@@ -777,6 +782,11 @@ function suppliesAround(c,now=Date.now()){
         if(!S.gone[s.id]&&dist(c,s)<800)out.push(s);
       }
     }
+  }
+  if(S.orbs<=0){   // never leave the player stranded: one cache always appears in the cell you stand in
+    const j0=Math.floor(c.lng/(SCELL/Math.cos((ci+.5)*SCELL*Math.PI/180))),lngS=SCELL/Math.cos((ci+.5)*SCELL*Math.PI/180),rnd=mulberry(hash(ci+555,j0+666,win));
+    const g={id:`sg${ci}_${j0}_${win}`,lat:ci*SCELL+rnd()*SCELL,lng:j0*lngS+rnd()*lngS,name:'Supply cache',e:'◈',supply:true};
+    if(!S.gone[g.id]&&!out.some(x=>dist(x,g)<60))out.push(g);
   }
   return out;
 }
