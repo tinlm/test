@@ -199,6 +199,9 @@
   .jgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px}
   .qi.num{font-size:15px;padding:7px 2px}
   .jw{margin-top:4px;color:#c9a35a}
+  .jgrp{margin-top:12px;display:flex;align-items:center;gap:10px;font:400 9px var(--mono);letter-spacing:.18em;color:var(--gold);text-transform:uppercase}
+  .jgrp span{flex:1}
+  .jgrp select.qi.sel{flex:1.3;padding:8px 6px;font-size:13px}
   .pickbar{position:absolute;left:10px;right:10px;bottom:70px;z-index:1100;display:none;align-items:center;gap:8px;background:#000e;border:1px solid #fff;padding:8px 10px}
   .pickbar.on{display:flex}
   .pickbar span{flex:1;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
@@ -1216,7 +1219,7 @@ function jSeq(j){
 
 /* node helpers: stages hold a "gate" of side quests, side quests hold "subs". children can be done in any order ('free') or in sequence ('seq') */
 const jKidsOf=n=>n.gate||n.subs||[];
-const jOrd=n=>n.order==='free'?'free':'seq';
+const jOrd=n=>n.order==='seq'?'seq':'free';
 function jCond(n){return Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond||{});}
 function jIdx(j){
   const m={};
@@ -1359,17 +1362,19 @@ function jFind(j,id){   // -> {arr,i} of the array that holds this side quest or
 }
 function jQOpts(sel){return S.quests.map(q=>`<option value="${q.id}"${q.id===sel?' selected':''}>${esc(q.name)}</option>`).join('');}
 function jOptsHTML(n){
-  const c=jCond(n),has=jKidsOf(n).length;
+  const c=jCond(n);
   let h=`<div class="jopt">`;
-  if(has)h+=`<label>Needed first<select class="qi sel" data-f="jord" data-n="${n.id}"><option value="seq"${jOrd(n)==='seq'?' selected':''}>In order</option><option value="free"${jOrd(n)==='free'?' selected':''}>Any order (choice)</option></select></label>`;
   h+=`<div class="jgrid"><label>Level ≥<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jlvl" data-n="${n.id}" value="${c.lvl||''}" placeholder="0"></label>
     <label>Total XP ≥<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jxp" data-n="${n.id}" value="${c.xp||''}" placeholder="0"></label>
     <label>Wait (min)<input class="qi num" type="number" min="0" inputmode="numeric" data-f="jwait" data-n="${n.id}" value="${c.wait||''}" placeholder="0"></label>
     <label>Wait counts from<select class="qi sel" data-f="jfrom" data-n="${n.id}"><option value="start"${c.from==='start'?' selected':''}>Journey start</option><option value="prev"${c.from==='prev'?' selected':''}>Previous step done</option></select></label></div></div>`;
   return h;
 }
+function jGrpHTML(n,depth){
+  return `<div class="jgrp" style="margin-left:${depth*14}px"><span>Needed first${n.gate?' to unlock this stage':' for the quest below'}</span><select class="qi sel" data-f="jord" data-n="${n.id}"><option value="free"${jOrd(n)==='free'?' selected':''}>Any order (player chooses)</option><option value="seq"${jOrd(n)==='seq'?' selected':''}>In order</option></select></div>`;
+}
 function jSideEditHTML(j,n,depth,idx,len){
-  let h='';
+  let h=n.subs.length?jGrpHTML(n,depth+1):'';
   n.subs.forEach((s,i)=>{h+=jSideEditHTML(j,s,depth+1,i,n.subs.length);});
   h+=`<div class="jn side edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${depth?'SUB':'SIDE'}</span>
     <div class="mini"><button data-act="jup" data-n="${n.id}"${idx?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${idx<len-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div></div>
@@ -1383,6 +1388,7 @@ function jeditHTML(){
   h+=`<div class="qsub" style="margin-top:8px;line-height:1.6">Side quests gate the stage below them, and sub-quests gate their parent. Set each group to In order or Any order (the player's choice). Add limits like level, XP or waiting time on any step.</div>`;
   j.stages.forEach((st,k)=>{
     h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`;
+    if(st.gate.length)h+=jGrpHTML(st,0);
     st.gate.forEach((g,i)=>{h+=jSideEditHTML(j,g,0,i,st.gate.length);});
     h+=`<div class="qrow" style="margin-top:8px"><button class="btn ghost sm" data-act="jgate" data-n="${st.id}">+ Side quest to unlock this stage</button></div>`;
     h+=`<div class="jn main edit"><div class="jh"><span class="idx jx">STAGE ${jPad(k+1)}</span>
@@ -1420,9 +1426,9 @@ function jClick(b){
     case 'jnew':if(DEV){if(!S.quests.length){toast('Create a quest first');return;}jOpenEditor({id:'j'+qid(),name:'',createdAt:Date.now(),stages:[]},true);}break;
     case 'jedit':{const j=S.journeys.find(x=>x.id===id);if(DEV&&j)jOpenEditor(clone(j),false);break;}
     /* editor */
-    case 'jstage':if(JED){JED.j.stages.push({id:qid(),questId:S.quests[0].id,gate:[],order:'seq'});renderQD();}break;
-    case 'jgate':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].gate.push({id:qid(),questId:S.quests[0].id,subs:[],order:'seq'});renderQD();}}break;
-    case 'jsub':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].subs.push({id:qid(),questId:S.quests[0].id,subs:[],order:'seq'});renderQD();}}break;
+    case 'jstage':if(JED){JED.j.stages.push({id:qid(),questId:S.quests[0].id,gate:[],order:'free'});renderQD();}break;
+    case 'jgate':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].gate.push({id:qid(),questId:S.quests[0].id,subs:[],order:'free'});renderQD();}}break;
+    case 'jsub':if(JED){const f=jFind(JED.j,nid);if(f){f.arr[f.i].subs.push({id:qid(),questId:S.quests[0].id,subs:[],order:'free'});renderQD();}}break;
     case 'jdel':if(JED){const f=jFind(JED.j,nid);if(f){
       const n=f.arr[f.i],cnt=n.gate?n.gate.length+1:(n.subs&&n.subs.length?n.subs.length+1:0);
       if(cnt>1&&!confirm('Delete this and everything nested under it?'))break;
