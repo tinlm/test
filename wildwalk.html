@@ -207,7 +207,23 @@
   .jpin.stage b{transform:rotate(-45deg);font-weight:500}
   .jpin.side{border-style:dashed}
   .jpin.pool{border-radius:50%;width:28px;height:28px;font-size:17px}
-  .jpin.near::after{content:"";position:absolute;inset:-8px;border:1px solid currentColor;border-radius:inherit;animation:ping 2s ease-out infinite}
+  .jpin.stage::before,.jpin.side::before,.jpin.stage::after,.jpin.side::after,.jpin.item::after,.jpin.pool::after,.jpin.near::after{content:"";position:absolute;inset:-4px;border:1px solid currentColor;border-radius:inherit;animation:ping 2.2s ease-out infinite;pointer-events:none}
+  .jpin.stage::after,.jpin.side::after{animation-delay:1.1s}
+  .jpin.stage::before,.jpin.stage::after{border-width:2px}
+  .jpin.pool{width:32px;height:32px;border-color:#fff;box-shadow:0 0 0 3px #0008}
+  .jpin.pool::after{animation-duration:3s}
+  .jpin.item{border-radius:50%;width:34px;height:34px;color:var(--ice);border-color:var(--ice);font-size:18px}
+  .jpin.item.pic b{width:100%;height:100%;border-radius:50%;overflow:hidden;display:block}
+  .jpin.item.pic img{width:100%;height:100%;object-fit:cover;display:block}
+  .beast.pic{filter:none;font-size:0}
+  .beast.pic img{width:92px;height:92px;border-radius:50%;object-fit:cover;border:1px solid #fff;display:block}
+  #qpI{display:none;align-items:center;justify-content:center;margin:0 0 10px;width:84px;height:84px;border-radius:50%;border:1px solid var(--hi);overflow:hidden;font-size:44px}
+  #qpI img{width:100%;height:100%;object-fit:cover}
+  .card .dimg{width:46px;height:46px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 4px}
+  .isw{display:flex;align-items:center;gap:10px;margin-top:8px;font:500 14px var(--sans);letter-spacing:.06em}
+  .isw input{width:20px;height:20px;accent-color:#fff}
+  .ithumb{width:64px;height:64px;border-radius:50%;border:1px solid var(--hi);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;flex:none}
+  .ithumb img{width:100%;height:100%;object-fit:cover}
   .qsheet.pop h2{margin-top:4px}
   .pgold{color:var(--gold)}
   .jpool{margin-top:6px}
@@ -289,7 +305,7 @@
 <div class="nav">
   <button id="bLoc">Locate</button>
   <button id="bQuest">Quests</button>
-  <button id="bDex">Dex</button>
+  <button id="bDex">Items</button>
   <button id="bOrbit">Orbit</button>
   <button id="bSim">Sim</button>
 </div>
@@ -306,6 +322,7 @@
 
 <div class="qsheet pop" id="qpop">
   <button class="xq" id="qpX" aria-label="Close">×</button>
+  <div id="qpI"></div>
   <div class="qsub" id="qpE"></div>
   <h2 id="qpT"></h2>
   <div class="qsub" id="qpS"></div>
@@ -344,8 +361,8 @@
 
 <div class="drawer" id="dex">
   <button class="x" id="dexX">×</button>
-  <h1 id="dexT">Dex</h1>
-  <div class="sub">Specimen log</div>
+  <h1 id="dexT">Items</h1>
+  <div class="sub">Collected items</div>
   <div class="grid" id="dexG"></div>
   <div class="row"><span>Simulation mode</span><div class="sw" id="simSw"></div></div>
   <div class="row"><span>Reset progress</span><button class="btn ghost" id="reset">Reset</button></div>
@@ -596,6 +613,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!gotFix&&
 /* ================= Spawns ================= */
 const spawnMarkers={};
 function spawnsAround(center,now=Date.now()){
+  return [];
   const win=Math.floor(now/WINDOW), out=[];
   const ci=Math.floor(center.lat/CELL);
   for(let i=ci-4;i<=ci+4;i++){
@@ -627,53 +645,77 @@ function refresh(){
   for(const id in S.gone){if(S.gone[id]<now-70*60e3)delete S.gone[id];}
   refreshStops();refreshPins();
 }
-function tapSpawn(s){
+function tapSpawn(s){return;
   if(PICK)return;
   const d=dist(player,s);
   if(d>CATCH_RANGE){toast(`${s.sp.n}<small>${Math.round(d)} m away · get within ${CATCH_RANGE} m</small>`);return;}
   openCatch(s);
 }
 
-/* ================= Catch minigame ================= */
+/* ================= Throw minigame: starts a quest or collects an item ================= */
 let cur=null,raf=null,ringR=120;
 const TARGET_R=40;
-function openCatch(s){
-  cur={s,misses:0};
-  $('cName').textContent=s.sp.n;$('cSub').textContent=`${RNAME[s.sp.r]} · ${pips(s.sp.r)}`;
-  $('beast').textContent=s.sp.e;
-  $('cTip').textContent='Throw when the ring meets the dashed circle';
+function setBeast(pin){
+  const be=$('beast');
+  if(pin.kind==='item'&&pin.item.img){be.classList.add('pic');be.innerHTML=`<img alt="" src="${pin.item.img}">`;}
+  else{be.classList.remove('pic');be.textContent=pin.kind==='item'?(pin.item.icon||'◆'):pin.kind==='stage'?'★':pin.kind==='side'?'◆':'+';}
+}
+function openCatch(pin){
+  closePop();
+  const item=pin.kind==='item';
+  cur={pin,misses:0,speed:item?1100:1300,tol:item?15:18};
+  $('cName').textContent=item?'Mystery item':pin.title;
+  $('cSub').textContent=item?(pin.bait||'Something is waiting here'):pinLabel(pin);
+  setBeast(pin);
+  $('cTip').textContent=item?'Throw when the ring meets the dashed circle':'Throw when the ring meets the dashed circle to start the quest';
   $('target').style.width=$('target').style.height=TARGET_R*2+'px';
   $('catch').classList.add('open');startRing();updateHud();
 }
 function startRing(){
   cancelAnimationFrame(raf);const t0=performance.now();
-  const speed=1500-cur.s.sp.r*180;
+  const speed=cur.speed;
   const step=t=>{const p=((t-t0)%speed)/speed;ringR=125-(125-16)*p;
     const r=$('ring');r.style.width=r.style.height=ringR*2+'px';raf=requestAnimationFrame(step);};
   raf=requestAnimationFrame(step);
 }
 function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
 $('runBtn').onclick=closeCatch;
+function revealItem(it,xp,isNew){
+  $('qpI').innerHTML=it.img?`<img alt="" src="${it.img}">`:`<span>${esc(it.icon||'◆')}</span>`;$('qpI').style.display='flex';
+  $('qpE').textContent=isNew?'Item collected':'Item';
+  $('qpT').textContent=it.name;$('qpS').textContent=it.text||'';
+  $('qpR').innerHTML=xp!=null?`<div><b class="pgold">+${xp}</b><span>XP</span></div>`:'';
+  $('qpN').textContent='';$('qpB').innerHTML='';
+  $('qpop').classList.add('open');
+}
 $('throwBtn').onclick=()=>{
   if(!cur)return;
-  if(S.orbs<=0){toast('Out of orbs<small>Visit a stop to resupply</small>',2600);closeCatch();return;}
-  S.orbs--;
-  const tol=22-cur.s.sp.r*3, off=Math.abs(ringR-TARGET_R);
-  if(off<=tol){
-    const sp=cur.s.sp,great=off<=tol/3;
-    const cp=Math.round(sp.r*120+Math.random()*180+(great?40:0));
-    const d=S.dex[sp.id]||{count:0,best:0};d.count++;d.best=Math.max(d.best,cp);S.dex[sp.id]=d;
-    const old=level(S.xp),xp=40*sp.r+(d.count===1?100:0)+(great?25:0);S.xp+=xp;
-    S.gone[cur.s.id]=Date.now();save();
+  const pin=cur.pin,item=pin.kind==='item';
+  if(item&&S.orbs<=0){toast('Out of orbs<small>Visit a stop or supply cache to resupply</small>',2600);closeCatch();return;}
+  if(S.orbs>0)S.orbs--;      // starting a quest uses an orb when you have one, but never blocks you without
+  const off=Math.abs(ringR-TARGET_R);
+  if(off<=cur.tol){
+    const great=off<=cur.tol/3;
     vib([60,40,120]);
-    const note=missionEvent('catch',{r:sp.r});
-    toast(`${great?'Perfect · ':''}Captured ${sp.n}<small>CP ${cp} · +${xp} XP${d.count===1?' · new specimen':''}${level(S.xp)>old?` · level ${level(S.xp)}`:''}${note?' · '+note:''}</small>`,3400);
-    closeCatch();
-  }else{
-    cur.misses++;vib(80);
-    if(cur.misses>=3){S.gone[cur.s.id]=Date.now();save();toast(`${cur.s.sp.n} escaped`);closeCatch();}
-    else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
+    if(item){
+      const it=pin.item,old=level(S.xp),xp=(it.xp>0?it.xp:50)+(great?25:0);
+      S.dex[it.id]={count:1,at:Date.now(),great};S.xp+=xp;save();
+      const note=missionEvent('catch',{});
+      closeCatch();updateHud();revealItem(it,xp,true);
+      if(note)toast(note,2600);
+      else if(level(S.xp)>old)toast(`Level ${level(S.xp)}`,2200);
+    }else{
+      closeCatch();updateHud();
+      startQuest(pin.q.id,Object.assign({},pin.ctx,{auto:true}),pin.q);
+    }
+    return;
   }
+  cur.misses++;vib(80);
+  if(cur.misses>=3){
+    if(item){S.gone[pin.key]=Date.now();toast('It slipped away<small>It may come back later</small>');}
+    else toast('Missed<small>Tap the marker to try again</small>');
+    save();closeCatch();
+  }else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
   updateHud();
 };
 
@@ -771,7 +813,7 @@ function tapStop(s){
 }
 
 /* ================= Missions (a travel mission every second mission) ================= */
-const mType=i=>i%2===0?'visit':(Math.floor(i/2)%2===0?'catch':'rare');
+const mType=i=>i%2===0?'visit':'catch';
 function visitCandidates(maxD){
   const now=Date.now(),pool=stops.filter(s=>(S.stopCd[s.id]||0)<now-STOP_COOLDOWN).concat(suppliesAround(player,now));
   return pool.map(s=>({s,d:dist(player,s)})).filter(o=>o.d>STOP_RANGE+60&&o.d<maxD)
@@ -787,8 +829,11 @@ function newMission(){
       return {type:'visit',id:s.id,name:s.name,e:s.e,lat:s.lat,lng:s.lng,supply:!!s.supply,xp:Math.max(50,Math.min(160,Math.round(40+o.d/10)))};
     }
   }
-  if(type==='rare')return {type:'rare',need:1,have:0,minR:2,xp:120};
-  return {type:'catch',need:3+Math.floor(level(S.xp)/6),have:0,xp:80};
+  if(type==='catch'){
+    if((S.items||[]).some(i=>!S.dex[i.id]))return {type:'catch',need:1,have:0,xp:80};
+    S.mIdx++;   // no items to collect yet: move on to a travel mission
+  }
+  return null;
 }
 function ensureMission(){
   if(S.mission&&S.mission.type==='visit'&&dist(player,S.mission)>2500)S.mission=null;
@@ -802,8 +847,7 @@ function missionEvent(kind,data){
   let done=false;
   if(kind==='visit'&&m.type==='visit'&&m.id===data.id)done=true;
   if(kind==='catch'){
-    if(m.type==='catch'){m.have++;done=m.have>=m.need;}
-    else if(m.type==='rare'&&data.r>=m.minR){m.have++;done=m.have>=m.need;}
+    if(m.type==='catch'||m.type==='rare'){m.have++;done=m.have>=m.need;}
   }
   if(done){
     const x=m.xp;S.xp+=x;S.mIdx++;S.mission=null;save();ensureMission();renderMission();updateHud();
@@ -813,20 +857,19 @@ function missionEvent(kind,data){
 }
 function renderMission(){
   if(S.active){questLine();return;}
-  const t=$('mt'),d=$('md'),np=PINS.filter(x=>x.kind!=='pool').sort((a,b)=>dist(player,a)-dist(player,b))[0];
-  if(np){$('mhl').textContent=pinLabel(np).split(' · ')[0];t.textContent='Travel to '+np.title;const x=dist(player,np);d.textContent=x<=QUEST_RANGE?'IN RANGE':fmtD(x);return;}
+  const t=$('mt'),d=$('md'),np=PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  if(np){$('mhl').textContent=pinLabel(np).split(' · ')[0];t.textContent='Travel to '+np.title;const x=dist(player,np);d.textContent=x<=CATCH_RANGE?'IN RANGE':fmtD(x);return;}
   $('mhl').textContent='Missions';
   const m=S.mission;
   if(!m){t.textContent='Scanning for missions';d.textContent='';return;}
   if(m.type==='visit'){
     t.textContent='Travel to '+m.name;
     const x=dist(player,m);d.textContent=x<=STOP_RANGE?'IN RANGE':fmtD(x);
-  }else if(m.type==='catch'){t.textContent=`Capture ${m.need} creatures`;d.textContent=`${m.have}/${m.need}`;}
-  else{t.textContent='Capture 1 uncommon or better';d.textContent=`${m.have}/${m.need}`;}
+  }else{t.textContent=`Collect ${m.need} item${m.need>1?'s':''}`;d.textContent=`${m.have}/${m.need}`;}
 }
 $('mq').onclick=()=>{
   if(S.active){if(S.active.phase==='tasks')openSheet();else focusTarget();return;}
-  const np=PINS.filter(x=>x.kind!=='pool').sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  const np=PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b))[0];
   if(np){showPop(np,true);return;}
   const m=S.mission;
   if(m&&m.type==='visit'){document.body.dataset.follow='0';map.easeTo({center:[m.lng,m.lat],duration:700});}
@@ -841,12 +884,18 @@ function updateHud(){
   save();
 }
 function renderDex(){
-  const have=Object.keys(S.dex).length;
-  $('dexT').textContent=`Dex ${String(have).padStart(2,'0')}/${SPECIES.length}`;
-  $('dexG').innerHTML=SPECIES.map(s=>{const d=S.dex[s.id];
-    return `<div class="card r${s.r}${d?'':' no'}"><span class="e">${s.e}</span><b>${d?s.n:'Unknown'}</b><span class="pips">${pips(s.r)}</span>${d?`CP ${d.best} · x${d.count}`:RNAME[s.r]}</div>`;}).join('');
+  const items=S.items||[],have=items.filter(i=>S.dex[i.id]).length,pd=n=>String(n).padStart(2,'0');
+  $('dexT').textContent=`Items ${pd(have)}/${pd(items.length)}`;
+  $('dexG').innerHTML=items.length?items.map(it=>{const d=S.dex[it.id];
+    return `<div class="card${d?'':' no'}" data-it="${it.id}">${d?(it.img?`<img class="dimg" alt="" src="${it.img}">`:`<span class="e">${esc(it.icon||'◆')}</span>`):'<span class="e">?</span>'}<b>${d?esc(it.name):'Unknown'}</b>${d?'collected':'not found'}</div>`;}).join('')
+    :'<div class="sub" style="grid-column:1/-1">No items yet. A developer creates them (switch in Orbit).</div>';
   $('simSw').classList.toggle('on',SIM);
 }
+$('dexG').addEventListener('click',e=>{
+  const c=e.target.closest('[data-it]');if(!c)return;
+  const it=(S.items||[]).find(x=>x.id===c.dataset.it);
+  if(it&&S.dex[it.id]){$('dex').classList.remove('open');revealItem(it,null,false);}
+});
 $('bDex').onclick=()=>{renderDex();$('dex').classList.add('open');};
 $('dexX').onclick=()=>$('dex').classList.remove('open');
 $('reset').onclick=()=>{if(confirm(`Reset progress for ${CUR.name}?\nQuests, journeys and items are kept. This profile starts over.`)){CUR.state={};PS.cur=CUR.id;localStorage.setItem(LSP,JSON.stringify(PS));location.reload();}};
@@ -952,10 +1001,10 @@ function onQuestChange(){
   drawQuestMarkers();renderMission();setReadout();
   $('bQuest').classList.toggle('on',!!S.active);
   refreshPins();
-  if($('qd').classList.contains('open')&&(QV.view==='list'||QV.view==='journeys'||QV.view==='jview'))renderQD();
+  if($('qd').classList.contains('open')&&(QV.view==='list'||QV.view==='journeys'||QV.view==='jview'||QV.view==='items'))renderQD();
 }
 function questTick(){
-  const R=S.active;if(!R){pinTick();return;}
+  const R=S.active;if(!R){return;}
   if(SIM||!lastPt)lastPt={...player};
   else{const d=dist(lastPt,player);if(d>=6){if(d<250)R.walked+=d;lastPt={...player};}}   // GPS-walked distance, jitter filtered
   updateGuide();
@@ -1151,10 +1200,11 @@ function renderQD(){
   if(QV.view==='done'&&!S.runs.find(x=>x.id===QV.runId))QV={view:'list'};
   const changed=renderQD.last!==QV.view;renderQD.last=QV.view;
   if(QV.view==='jedit'&&(!JED||!DEV)){JED=null;QV={view:'journeys'};}
+  if((QV.view==='iedit'&&(!IED||!DEV))||(QV.view==='items'&&!DEV)){IED=null;QV={view:'list'};}
   if(QV.view==='jview'&&!S.journeys.find(x=>x.id===QV.jid))QV={view:'journeys'};
   const V=QV.view;
-  $('qdT').textContent=V==='edit'?(ED.isNew?'New quest':'Edit quest'):V==='done'?'Quest complete':V==='jedit'?(JED.isNew?'New journey':'Edit journey'):(V==='journeys'||V==='jview')?'Journeys':'Quests';
-  $('qdB').innerHTML=V==='edit'?editHTML():V==='done'?doneHTML():V==='jedit'?jeditHTML():V==='jview'?jviewHTML():V==='journeys'?journeysHTML():listHTML();
+  $('qdT').textContent=V==='edit'?(ED.isNew?'New quest':'Edit quest'):V==='done'?'Quest complete':V==='jedit'?(JED.isNew?'New journey':'Edit journey'):(V==='journeys'||V==='jview')?'Journeys':V==='iedit'?(IED.isNew?'New item':'Edit item'):V==='items'?'Items':'Quests';
+  $('qdB').innerHTML=V==='edit'?editHTML():V==='done'?doneHTML():V==='jedit'?jeditHTML():V==='jview'?jviewHTML():V==='journeys'?journeysHTML():V==='iedit'?iEditHTML():V==='items'?itemsHTML():listHTML();
   if(changed)$('qdB').scrollTop=0;
   if(QV.focus){
     const [a,b]=QV.focus.split(':'),el=$('qdB').querySelector(`[data-f="task"][data-i="${a}"][data-j="${b}"]`);
@@ -1165,6 +1215,7 @@ function renderQD(){
 function openQuestDrawer(){renderQD();$('qd').classList.add('open');}
 $('bQuest').onclick=()=>{if(PICK)exitPick(false);openQuestDrawer();};
 $('qdX').onclick=()=>{
+  if(QV.view==='iedit'){if(iDirty()&&!confirm('Discard unsaved changes?'))return;IED=null;QV={view:'items'};renderQD();return;}
   if(QV.view==='jedit'){if(jDirty()&&!confirm('Discard unsaved changes?'))return;JED=null;QV={view:'journeys'};renderQD();return;}
   if(QV.view==='edit'){
     if(edDirty()&&!confirm('Discard unsaved changes?'))return;
@@ -1182,6 +1233,7 @@ $('qdB').addEventListener('input',e=>{
 });
 $('qdB').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b||b.disabled)return;
+  if(/^it_|^tabi$/.test(b.dataset.act)){itClick(b);return;}
   if(/^(j|tab)/.test(b.dataset.act)){jClick(b);return;}
   const a=b.dataset.act,i=+b.dataset.i,j=+b.dataset.j,id=b.dataset.id;
   const redraw=()=>{drawQuestMarkers();renderQD();};
@@ -1334,7 +1386,7 @@ function jOnFinish(R){
 }
 
 /* --- drawer views --- */
-const tabsHTML=on=>`<div class="tabs"><button data-act="tabq" class="${on==='q'?'on':''}">Quests</button><button data-act="tabj" class="${on==='j'?'on':''}">Journeys</button></div>`;
+const tabsHTML=on=>`<div class="tabs"><button data-act="tabq" class="${on==='q'?'on':''}">Quests</button><button data-act="tabj" class="${on==='j'?'on':''}">Journeys</button>${DEV?`<button data-act="tabi" class="${on==='i'?'on':''}">Items</button>`:''}</div>`;
 function journeysHTML(){
   let h=tabsHTML('j');
   if(DEV)h+=`<div class="qrow"><button class="btn sm" data-act="jnew" style="flex:1">+ New journey</button></div>`;
@@ -1381,7 +1433,7 @@ function jviewHTML(){
     <div class="qsub" style="margin-top:6px">${p.complete?'Journey complete · ':''}Stages ${p.doneMains}/${p.mains} · side quests ${p.doneSides}/${p.sides} · ${av.length} available now</div>
     <div class="pb gold"><i style="width:${pct}%"></i></div>`;
   j.stages.forEach((st,k)=>{
-    h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`+jBlockHTML(j,m,st,0);
+    h+=`<div class="jlbl" style="margin-top:20px;color:var(--gold)">Stage ${jPad(k+1)}</div>`+(DEV?`<div class="qsub">XP quest types ${(st.pool||[]).length} · items ${(st.items||[]).length}</div>`:'')+jBlockHTML(j,m,st,0);
   });
   h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="jreset" data-id="${j.id}">Reset progress</button></div>`;
   return h;
@@ -1440,7 +1492,7 @@ function jeditHTML(){
       <div class="mini"><button data-act="jup" data-n="${st.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${st.id}"${k<j.stages.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${st.id}">×</button></div></div>
       <input class="qi" data-f="jtitle" data-n="${st.id}" maxlength="50" placeholder="Stage title (optional), e.g. The Mountain" value="${esc(st.title||'')}">
       <select class="qi sel" data-f="jq" data-n="${st.id}" style="margin-top:8px">${jQOpts(st.questId)}</select>${jOptsHTML(st)}</div>`;
-    h+=poolEditHTML(st);
+    h+=poolEditHTML(st)+stageItemsHTML(st);
   });
   h+=`<div class="qrow"><button class="btn${j.stages.length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
   h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
@@ -1453,7 +1505,8 @@ function jSave(){
   if(!j.name){toast('Name your journey');const n=$('jName');if(n)n.focus();return;}
   if(!j.stages.length){toast('Add at least one stage');return;}
   if(jSeq(j).some(e=>!jQuest(e.n))){toast('Every step needs a quest');return;}
-  j.stages.forEach(st=>{st.pool=(st.pool||[]).map(t=>({...t,name:(t.name||'').trim()||'XP quest',xp:t.xp>0?t.xp:30})).filter(t=>t.tasks&&t.tasks.length);});
+  for(const st of j.stages){for(const t of (st.pool||[])){if(!t.tasks||!t.tasks.length){toast(`XP quest "${esc((t.name||'').trim()||'unnamed')}" needs at least one task<small>Type one task per line</small>`,3600);return;}}}
+  j.stages.forEach(st=>{st.pool=(st.pool||[]).map(t=>({...t,name:(t.name||'').trim()||'XP quest',xp:t.xp>0?t.xp:30}));st.items=(st.items||[]).filter(id=>(S.items||[]).some(x=>x.id===id));});
   const k=S.journeys.findIndex(x=>x.id===j.id);
   if(k>=0)S.journeys[k]=j;else S.journeys.push(j);
   /* keep progress only for steps that still exist */
@@ -1516,6 +1569,7 @@ $('qdB').addEventListener('change',e=>{
   if(f==='jq')n.questId=t.value;
   else if(f==='jord')n.order=t.value;
   else if(f==='jfrom')n.cond=Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond,{from:t.value});
+  else if(f==='sitem'){const st=n;st.items=(st.items||[]).filter(x=>x!==t.dataset.i);if(t.checked)st.items.push(t.dataset.i);return;}
   else return;
   renderQD();
 });
@@ -1534,8 +1588,85 @@ $('qdB').addEventListener('change',e=>{
 
 S.journeys.forEach(j=>{if(!S.jstart||!S.jstart[j.id]){if(!S.jstart)S.jstart={};S.jstart[j.id]=Date.now();}});
 
+/* ================= Items: made by the developer, collected by players ================= */
+let IED=null;
+const iNew=()=>({id:'i'+qid(),name:'',icon:'',img:'',text:'',bait:'',xp:50});
+function itemsHTML(){
+  let h=tabsHTML('i');
+  h+=`<div class="qrow"><button class="btn sm" data-act="it_new" style="flex:1">+ New item</button></div><div class="qh3">Items</div>`;
+  const its=S.items||[];
+  if(!its.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">No items yet. Create one, then switch it on for a stage in the journey editor.</div>`;
+  its.forEach(it=>{
+    const used=S.journeys.reduce((n,j)=>n+j.stages.filter(st=>(st.items||[]).includes(it.id)).length,0);
+    h+=`<div class="qc"><div class="qlh"><div class="ithumb">${it.img?`<img alt="" src="${it.img}">`:esc(it.icon||'◆')}</div>
+      <div style="min-width:0"><div class="qch"><b>${esc(it.name||'Unnamed')}</b></div><div class="qsub" style="margin-top:4px">+${it.xp>0?it.xp:50} XP · ${used?'on '+used+' stage'+(used>1?'s':''):'not placed on a stage'}</div></div></div>
+      <div class="qrow"><button class="btn ghost sm" data-act="it_edit" data-id="${it.id}">Edit</button></div></div>`;
+  });
+  return h;
+}
+function iEditHTML(){
+  const it=IED.it;
+  let h=`<input class="qi name" data-f="inm" maxlength="40" placeholder="Item name" value="${esc(it.name)}">`;
+  h+=`<div class="qlh" style="margin-top:14px"><div class="ithumb">${it.img?`<img alt="" src="${it.img}">`:esc(it.icon||'◆')}</div><div style="flex:1;min-width:0">
+    <label class="jgrid" style="display:block;font:400 9px var(--mono);letter-spacing:.18em;color:var(--muted);text-transform:uppercase">Picture<input type="file" accept="image/*" id="iFile" style="display:block;margin-top:6px;color:var(--text);font-size:13px;max-width:100%"></label>
+    ${it.img?`<div class="qrow" style="margin-top:6px"><button class="btn ghost sm" data-act="it_nopic">Remove picture</button></div>`:''}</div></div>`;
+  h+=`<div class="jopt"><label>Icon (emoji, used when there is no picture)<input class="qi" data-f="iic" maxlength="4" placeholder="🗝" value="${esc(it.icon)}"></label></div>`;
+  h+=`<div class="jopt"><label>Clickbait message (shown on the map)<input class="qi" data-f="ibt" maxlength="90" placeholder="Someone left something behind…" value="${esc(it.bait)}"></label></div>`;
+  h+=`<div class="jopt"><label>Item text (revealed when collected)</label><textarea class="qi ta" data-f="itx" placeholder="The story of this item">${esc(it.text)}</textarea></div>`;
+  h+=`<div class="jopt"><label>XP reward<input class="qi num" type="number" min="0" inputmode="numeric" data-f="ixp" value="${it.xp||''}" placeholder="50"></label></div>`;
+  h+=`<div class="qrow"><button class="btn" data-act="it_save" style="flex:1">Save item</button>${IED.isNew?'':'<button class="btn ghost sm" data-act="it_del">Delete</button>'}</div>`;
+  return h;
+}
+const iDirty=()=>IED&&JSON.stringify(IED.it)!==IED.snap;
+function iOpen(it,isNew){IED={it,isNew,snap:JSON.stringify(it)};QV={view:'iedit'};renderQD();$('qd').classList.add('open');}
+function readPic(file){
+  return new Promise(res=>{
+    const fr=new FileReader();
+    fr.onload=()=>{const im=new Image();
+      im.onload=()=>{const N=256,c=document.createElement('canvas');c.width=c.height=N;const m=Math.min(im.width,im.height);
+        c.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,N,N);res(c.toDataURL('image/jpeg',.82));};
+      im.onerror=()=>res(null);im.src=fr.result;};
+    fr.onerror=()=>res(null);fr.readAsDataURL(file);
+  });
+}
+function itClick(b){
+  const a=b.dataset.act;
+  switch(a){
+    case 'tabi':QV={view:'items'};renderQD();break;
+    case 'it_new':if(DEV)iOpen(iNew(),true);break;
+    case 'it_edit':{const it=(S.items||[]).find(x=>x.id===b.dataset.id);if(DEV&&it)iOpen(clone(it),false);break;}
+    case 'it_nopic':if(IED){IED.it.img='';renderQD();}break;
+    case 'it_save':if(IED){
+      const it=IED.it;it.name=(it.name||'').trim();
+      if(!it.name){toast('Name your item');return;}
+      if(!it.icon&&!it.img)it.icon='◆';
+      const k=S.items.findIndex(x=>x.id===it.id);if(k>=0)S.items[k]=it;else S.items.push(it);
+      save();IED=null;QV={view:'items'};renderQD();toast(`Item saved<small>${esc(it.name)}</small>`,2000);}break;
+    case 'it_del':if(IED&&confirm(`Delete "${IED.it.name||'this item'}"?`)){
+      const id=IED.it.id;S.items=S.items.filter(x=>x.id!==id);S.journeys.forEach(j=>j.stages.forEach(st=>{st.items=(st.items||[]).filter(x=>x!==id);}));
+      save();IED=null;QV={view:'items'};renderQD();toast('Item deleted');}break;
+  }
+}
+$('qdB').addEventListener('input',e=>{
+  if(!IED)return;const t=e.target,f=t.dataset.f;
+  if(f==='inm')IED.it.name=t.value;else if(f==='iic')IED.it.icon=t.value;else if(f==='ibt')IED.it.bait=t.value;
+  else if(f==='itx')IED.it.text=t.value;else if(f==='ixp')IED.it.xp=Math.max(0,parseInt(t.value,10)||0);
+});
+$('qdB').addEventListener('change',async e=>{
+  const t=e.target;if(!IED||t.id!=='iFile'||!t.files||!t.files[0])return;
+  const d=await readPic(t.files[0]);
+  if(d){IED.it.img=d;renderQD();}else toast('Could not read that picture');
+});
+function stageItemsHTML(st){
+  const its=S.items||[];
+  let h=`<div class="jpool"><div class="jlbl" style="color:var(--ice)">Items that spawn here · once each</div>`;
+  if(!its.length)h+=`<div class="qsub" style="margin-top:6px">No items yet. Create some in the Items tab.</div>`;
+  its.forEach(it=>{h+=`<label class="isw"><input type="checkbox" data-f="sitem" data-n="${st.id}" data-i="${it.id}"${(st.items||[]).includes(it.id)?' checked':''}>${esc(it.name||'Unnamed')}</label>`;});
+  return h+'</div>';
+}
+
 /* ================= Map pins: every available quest sits on the map; arrive to start ================= */
-const PWIN=30*60e3,PCELL=0.0035;
+const PWIN=30*60e3,IWIN=60*60e3,PCELL=0.0025;
 let PINS=[],pinMute=0;const pinMarkers={};
 const hs=str=>[...String(str)].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,7);
 function poolSpawns(now=Date.now()){
@@ -1544,16 +1675,37 @@ function poolSpawns(now=Date.now()){
     const d=jDone(j),si=j.stages.findIndex(s=>!d[s.id]);if(si<0)return;
     const pool=(j.stages[si].pool||[]).filter(t=>t.tasks&&t.tasks.length);if(!pool.length)return;
     const ci=Math.floor(player.lat/PCELL);
-    for(let i=ci-3;i<=ci+3;i++){
+    for(let i=ci-4;i<=ci+4;i++){
       const lngSize=PCELL/Math.cos((i+.5)*PCELL*Math.PI/180),cj=Math.floor(player.lng/lngSize);
-      for(let k=cj-3;k<=cj+3;k++){
+      for(let k=cj-4;k<=cj+4;k++){
         const rnd=mulberry(hash(i+31337,k+271,win^hs(j.id)));
-        if(rnd()<.14){
+        if(rnd()<.12){
           const t=pool[Math.floor(rnd()*pool.length)],lat=i*PCELL+rnd()*PCELL,lng=k*lngSize+rnd()*lngSize;
           const id=`pq_${j.id}_${i}_${k}_${win}`;
-          if(S.gone[id]||dist(player,{lat,lng})>700)continue;
+          if(S.gone[id]||dist(player,{lat,lng})>650)continue;
           const q={id:'pool:'+t.id,name:t.name,xp:t.xp,locs:[{name:t.place||'Quest spot',lat,lng,tasks:t.tasks.map(x=>({text:x}))}]};
           out.push({key:id,kind:'pool',title:t.name,qname:'Repeatable XP quest',lat,lng,xp:questReward(q),places:1,tasks:t.tasks.length,route:0,q,ctx:{pool:id,label:'XP quest',auto:true},stage:si+1,jname:j.name});
+        }
+      }
+    }
+  });
+  return out;
+}
+function itemSpawns(now=Date.now()){
+  const out=[],win=Math.floor(now/IWIN);
+  S.journeys.forEach(j=>{
+    const d=jDone(j),si=j.stages.findIndex(s=>!d[s.id]);if(si<0)return;
+    const its=(j.stages[si].items||[]).map(id=>(S.items||[]).find(x=>x.id===id)).filter(it=>it&&!S.dex[it.id]);
+    if(!its.length)return;
+    const ci=Math.floor(player.lat/PCELL);
+    for(let i=ci-4;i<=ci+4;i++){
+      const lngSize=PCELL/Math.cos((i+.5)*PCELL*Math.PI/180),cj=Math.floor(player.lng/lngSize);
+      for(let k=cj-4;k<=cj+4;k++){
+        const rnd=mulberry(hash(i+7001,k+977,win^hs(j.id)));
+        if(rnd()<.05){
+          const it=its[Math.floor(rnd()*its.length)],lat=i*PCELL+rnd()*PCELL,lng=k*lngSize+rnd()*lngSize,id=`it_${it.id}_${i}_${k}_${win}`;
+          if(S.gone[id]||dist(player,{lat,lng})>650)continue;
+          out.push({key:id,kind:'item',item:it,title:it.name,bait:it.bait||'Something is waiting for you here',qname:'',lat,lng,xp:it.xp>0?it.xp:50,places:0,tasks:0,route:0,stage:si+1,jname:j.name});
         }
       }
     }
@@ -1568,16 +1720,16 @@ function jPins(){
     out.push({key:j.id+':'+e.n.id,kind:e.kind,title:jName(e.n),qname:q.name,lat:q.locs[0].lat,lng:q.locs[0].lng,xp:questReward(q),places:q.locs.length,tasks:questTaskCount(q),route:q.locs.length>1?routeLen(q):0,q,
       ctx:{jid:j.id,nid:e.n.id,jname:j.name,label:e.kind==='stage'?'Stage '+(e.si+1):'Side quest',auto:true},stage:e.si+1,jname:j.name});
   }));
-  return out.concat(poolSpawns());
+  return out.concat(poolSpawns(),itemSpawns());
 }
-const pinHTML=(p,near)=>`<div class="jpin ${p.kind}${near?' near':''}"><b>${p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>`;
+const pinHTML=(p,near)=>`<div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
   const keep=new Set(PINS.map(p=>p.key));
   for(const k in pinMarkers)if(!keep.has(k)){pinMarkers[k].mk.remove();delete pinMarkers[k];}
   PINS.forEach(p=>{
-    const near=dist(player,p)<=QUEST_RANGE;let o=pinMarkers[p.key];
-    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;showPop(o.pin);},6);o.near=near;pinMarkers[p.key]=o;}
+    const near=dist(player,p)<=CATCH_RANGE;let o=pinMarkers[p.key];
+    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;const q=o.pin;if(dist(player,q)<=CATCH_RANGE)openCatch(q);else showPop(q);},6);o.near=near;pinMarkers[p.key]=o;}
     else if(o.near!==near){o.near=near;o.el.innerHTML=pinHTML(p,near);}
     o.pin=p;
   });
@@ -1588,15 +1740,17 @@ function pinTick(){
   if(!p)return;
   closePop();startQuest(p.q.id,p.ctx,p.q);
 }
-function pinLabel(p){return p.kind==='stage'?`Stage ${jPad(p.stage)} · ${p.jname}`:p.kind==='side'?`Side quest · ${p.jname}`:'Repeatable XP quest';}
+function pinLabel(p){return p.kind==='item'?'Mystery item':p.kind==='stage'?`Stage ${jPad(p.stage)} · ${p.jname}`:p.kind==='side'?`Side quest · ${p.jname}`:'Repeatable XP quest';}
 function showPop(p,focus){
-  const d=dist(player,p),inR=d<=QUEST_RANGE;
+  const d=dist(player,p),inR=d<=CATCH_RANGE,item=p.kind==='item';
+  if(item){$('qpI').innerHTML=p.item.img?`<img alt="" src="${p.item.img}">`:`<span>${esc(p.item.icon||'◆')}</span>`;$('qpI').style.display='flex';}
+  else $('qpI').style.display='none';
   $('qpE').textContent=pinLabel(p);
-  $('qpT').textContent=p.title;
-  $('qpS').textContent=p.kind==='pool'?'':'Quest · '+p.qname;
-  $('qpR').innerHTML=`<div><b class="pgold">+${p.xp}</b><span>XP</span></div><div><b>${p.places}</b><span>Places</span></div><div><b>${p.tasks}</b><span>Tasks</span></div><div><b>${fmtD(d)}</b><span>Away</span></div>`;
-  $('qpN').textContent=inR?'You are here. It starts on its own.':`Travel to the marker (within ${QUEST_RANGE} m) and the quest starts automatically.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
-  $('qpB').innerHTML=`<button class="btn sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${DEV?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
+  $('qpT').textContent=item?p.bait:p.title;
+  $('qpS').textContent=item||p.kind==='pool'?'':'Quest · '+p.qname;
+  $('qpR').innerHTML=`<div><b class="pgold">+${p.xp}</b><span>XP</span></div>${item?'':`<div><b>${p.places}</b><span>Places</span></div><div><b>${p.tasks}</b><span>Tasks</span></div>`}<div><b>${fmtD(d)}</b><span>Away</span></div>`;
+  $('qpN').textContent=inR?(item?'You are close. Tap Collect and throw an orb.':'You are close. Tap Start and throw an orb to begin.'):`Get within ${CATCH_RANGE} m of the marker, tap it and throw an orb ${item?'to collect it':'to start'}.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
+  $('qpB').innerHTML=`<button class="btn sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${inR?`<button class="btn sm" data-act="pcatch" data-k="${esc(p.key)}">${item?'Collect':'Start'}</button>`:''}${DEV&&!item?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
   $('qpop').classList.add('open');
   if(focus)focusPin(p);
 }
@@ -1611,6 +1765,7 @@ $('qpop').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const p=PINS.find(x=>x.key===b.dataset.k);if(!p)return;
   if(b.dataset.act==='pshow')focusPin(p);
+  else if(b.dataset.act==='pcatch')openCatch(p);
   else if(b.dataset.act==='pstart'){closePop();startQuest(p.q.id,Object.assign({},p.ctx,{auto:false}),p.q);}
 });
 
