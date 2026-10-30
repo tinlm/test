@@ -202,6 +202,17 @@
   .jgrp{margin-top:12px;display:flex;align-items:center;gap:10px;font:400 9px var(--mono);letter-spacing:.18em;color:var(--gold);text-transform:uppercase}
   .jgrp span{flex:1}
   .jgrp select.qi.sel{flex:1.3;padding:8px 6px;font-size:13px}
+  .jpin{position:relative;width:34px;height:34px;display:grid;place-items:center;background:#000;border:1px solid #fff;font:500 15px var(--sans);color:#fff;cursor:pointer}
+  .jpin.stage{border-color:var(--gold);color:var(--gold);transform:rotate(45deg)}
+  .jpin.stage b{transform:rotate(-45deg);font-weight:500}
+  .jpin.side{border-style:dashed}
+  .jpin.pool{border-radius:50%;width:28px;height:28px;font-size:17px}
+  .jpin.near::after{content:"";position:absolute;inset:-8px;border:1px solid currentColor;border-radius:inherit;animation:ping 2s ease-out infinite}
+  .qsheet.pop h2{margin-top:4px}
+  .pgold{color:var(--gold)}
+  .jpool{margin-top:6px}
+  .jn.pool{border-left:3px dotted #6d7782}
+  textarea.qi.ta{min-height:64px;resize:vertical;border:1px solid var(--line);padding:8px;margin-top:8px;font-size:14px}
   .pickbar{position:absolute;left:10px;right:10px;bottom:70px;z-index:1100;display:none;align-items:center;gap:8px;background:#000e;border:1px solid #fff;padding:8px 10px}
   .pickbar.on{display:flex}
   .pickbar span{flex:1;font:400 10px var(--mono);letter-spacing:.14em;text-transform:uppercase;line-height:1.4}
@@ -292,6 +303,16 @@
 </div></div>
 
 <div class="pickbar" id="pickbar"><span id="pickTxt">Tap the map to add places</span><button id="pickUndo">Undo</button><button class="go" id="pickDone">Done</button></div>
+
+<div class="qsheet pop" id="qpop">
+  <button class="xq" id="qpX" aria-label="Close">×</button>
+  <div class="qsub" id="qpE"></div>
+  <h2 id="qpT"></h2>
+  <div class="qsub" id="qpS"></div>
+  <div class="rs" id="qpR"></div>
+  <div class="qsub" id="qpN" style="margin-top:10px;line-height:1.6"></div>
+  <div class="qrow" id="qpB"></div>
+</div>
 
 <div class="qsheet" id="qsheet">
   <button class="xq" id="qsX" aria-label="Minimise">×</button>
@@ -604,7 +625,7 @@ function refresh(){
     else if(o.near!==near){o.near=near;o.el.innerHTML=crHTML(s,near);}
   }
   for(const id in S.gone){if(S.gone[id]<now-70*60e3)delete S.gone[id];}
-  refreshStops();
+  refreshStops();refreshPins();
 }
 function tapSpawn(s){
   if(PICK)return;
@@ -792,8 +813,10 @@ function missionEvent(kind,data){
 }
 function renderMission(){
   if(S.active){questLine();return;}
+  const t=$('mt'),d=$('md'),np=PINS.filter(x=>x.kind!=='pool').sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  if(np){$('mhl').textContent=pinLabel(np).split(' · ')[0];t.textContent='Travel to '+np.title;const x=dist(player,np);d.textContent=x<=QUEST_RANGE?'IN RANGE':fmtD(x);return;}
   $('mhl').textContent='Missions';
-  const m=S.mission,t=$('mt'),d=$('md');
+  const m=S.mission;
   if(!m){t.textContent='Scanning for missions';d.textContent='';return;}
   if(m.type==='visit'){
     t.textContent='Travel to '+m.name;
@@ -803,6 +826,8 @@ function renderMission(){
 }
 $('mq').onclick=()=>{
   if(S.active){if(S.active.phase==='tasks')openSheet();else focusTarget();return;}
+  const np=PINS.filter(x=>x.kind!=='pool').sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  if(np){showPop(np,true);return;}
   const m=S.mission;
   if(m&&m.type==='visit'){document.body.dataset.follow='0';map.easeTo({center:[m.lng,m.lat],duration:700});}
 };
@@ -908,26 +933,29 @@ function focusTarget(){
 }
 
 /* --- runner --- */
-function startQuest(id,ctx){
+const questReward=q=>q.xp>0?q.xp:q.locs.length*40+questTaskCount(q)*10;
+function startQuest(id,ctx,qobj){
   if(S.active){toast('Quest in progress<small>Finish or abort it first</small>');return;}
-  const q=S.quests.find(x=>x.id===id);
+  const q=qobj||S.quests.find(x=>x.id===id);
   if(!q||!q.locs.length){toast('This quest has no locations');return;}
   if(!gotFix&&!SIM){toast('Waiting for GPS<small>Enable location or use Sim mode</small>');return;}
   S.active={id:'r'+Date.now().toString(36),questId:q.id,name:q.name,startedAt:Date.now(),endedAt:null,seen:Date.now(),status:'active',
-    sim:SIM,walked:0,idx:0,phase:'travel',journey:ctx?{jid:ctx.jid,nid:ctx.nid}:null,jlabel:ctx?ctx.label:null,jname:ctx?ctx.jname:null,
+    sim:SIM,walked:0,idx:0,phase:'travel',journey:ctx&&ctx.jid?{jid:ctx.jid,nid:ctx.nid}:null,poolInst:ctx&&ctx.pool||null,rewardXp:questReward(q),jlabel:ctx?ctx.label:null,jname:ctx?ctx.jname:null,
     locs:q.locs.map(l=>({name:l.name,lat:l.lat,lng:l.lng,arrivedAt:null,completedAt:null,tasks:l.tasks.map(t=>({text:t.text,doneAt:null}))}))};
   lastPt={...player};
   save();$('qd').classList.remove('open');
-  onQuestChange();focusTarget();vib([40,50,80]);
-  toast(`Quest started<small>${esc(q.name)} · ${q.locs.length} locations</small>`,3000);
+  onQuestChange();vib([40,50,80]);
+  if(ctx&&ctx.auto){toast(`Quest started<small>${esc(q.name)}</small>`,2400);arriveAt(S.active);}
+  else{focusTarget();toast(`Quest started<small>${esc(q.name)} · ${q.locs.length} locations</small>`,3000);}
 }
 function onQuestChange(){
   drawQuestMarkers();renderMission();setReadout();
   $('bQuest').classList.toggle('on',!!S.active);
+  refreshPins();
   if($('qd').classList.contains('open')&&(QV.view==='list'||QV.view==='journeys'||QV.view==='jview'))renderQD();
 }
 function questTick(){
-  const R=S.active;if(!R)return;
+  const R=S.active;if(!R){pinTick();return;}
   if(SIM||!lastPt)lastPt={...player};
   else{const d=dist(lastPt,player);if(d>=6){if(d<250)R.walked+=d;lastPt={...player};}}   // GPS-walked distance, jitter filtered
   updateGuide();
@@ -951,7 +979,8 @@ function completeLoc(R){
 }
 function finishQuest(R){
   R.endedAt=Date.now();R.status='completed';
-  const st=runStats(R);R.xp=R.locs.length*40+st.tasks*10;
+  const st=runStats(R);R.xp=R.rewardXp>0?R.rewardXp:R.locs.length*40+st.tasks*10;
+  if(R.poolInst)S.gone[R.poolInst]=Date.now();pinMute=Date.now()+6000;
   try{jOnFinish(R);}catch(e){console.warn('journey',e);}
   const old=level(S.xp);S.xp+=R.xp;R.levelUp=level(S.xp)>old;
   S.runs.unshift(R);if(S.runs.length>300)S.runs.length=300;
@@ -963,7 +992,7 @@ function abortQuest(reason){
   const R=S.active;if(!R)return;
   R.endedAt=reason==='closed'?(R.seen||Date.now()):Date.now();R.status='aborted';R.reason=reason;
   S.runs.unshift(R);if(S.runs.length>300)S.runs.length=300;
-  S.active=null;lastPt=null;save();
+  S.active=null;lastPt=null;pinMute=Date.now()+6000;save();
 }
 function abortQuestUI(){
   if(!S.active)return;
@@ -1084,7 +1113,7 @@ function listHTML(){
     h+=`<div class="qc"><div class="qch"><b>${esc(q.name)}</b></div>
       <div class="qsub" style="margin-top:6px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>
       <div class="qsub">${st.runs?`Runs ${st.runs} · completed ${st.done}${st.best!=null?' · best '+fmtT(st.best):''}`:'Not run yet'}</div>
-      <div class="qrow"><button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button>${DEV?`<button class="btn ghost sm" data-act="edit" data-id="${q.id}">Edit</button>`:''}</div></div>`;
+      <div class="qrow">${(!DEV&&jUses(q.id))?'':`<button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button>`}${DEV?`<button class="btn ghost sm" data-act="edit" data-id="${q.id}">Edit</button>`:''}</div></div>`;
   });
   h+=`<div class="qh3">Sessions</div>`;
   if(!S.runs.length)h+=`<div class="qsub" style="margin-top:8px">Every quest you start is logged here.</div>`;
@@ -1096,6 +1125,7 @@ function editHTML(){
   const q=ED.q;
   let h=`<input class="qi name" id="edName" placeholder="Quest name" maxlength="60" value="${esc(q.name)}">`;
   h+=`<div class="qsub" style="margin-top:8px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>`;
+  h+=`<div class="jopt"><label>Reward XP (empty = automatic)<input class="qi num" type="number" min="0" inputmode="numeric" data-f="qxp" value="${q.xp||''}" placeholder="${q.locs.length*40+questTaskCount(q)*10}"></label></div>`;
   q.locs.forEach((l,i)=>{
     h+=`<div class="ql"><div class="qlh"><span class="idx">${String(i+1).padStart(2,'0')}</span>
       <input class="qi" data-f="lname" data-i="${i}" maxlength="60" placeholder="Place name" value="${esc(l.name)}">
@@ -1147,6 +1177,7 @@ $('qdB').addEventListener('input',e=>{
   const t=e.target;if(!ED)return;
   if(t.id==='edName')ED.q.name=t.value;
   else if(t.dataset.f==='lname')ED.q.locs[+t.dataset.i].name=t.value;
+  else if(t.dataset.f==='qxp')ED.q.xp=Math.max(0,parseInt(t.value,10)||0);
   else if(t.dataset.f==='task')ED.q.locs[+t.dataset.i].tasks[+t.dataset.j].text=t.value;
 });
 $('qdB').addEventListener('click',e=>{
@@ -1205,7 +1236,7 @@ function saveQuest(){
 let JED=null;
 const jPad=n=>String(n).padStart(2,'0');
 const jQuest=n=>S.quests.find(x=>x.id===n.questId);
-const jName=n=>{const q=jQuest(n);return q?q.name:'Missing quest';};
+const jName=n=>{if(n.title&&n.title.trim())return n.title.trim();const q=jQuest(n);return q?q.name:'Missing quest';};
 const jDone=j=>(S.jprog&&S.jprog[j.id])||{};
 function jSeq(j){
   const out=[];
@@ -1325,10 +1356,12 @@ function jCardHTML(j,e,m){
   let h=`<div class="jn ${e.kind==='stage'?'main':'side'} ${st}" style="margin-left:${e.depth*14}px">
     <div class="jh"><span class="idx jx">${e.kind==='stage'?'STAGE '+jPad(e.si+1):'SIDE'}</span><span class="tag">${chip}</span></div>
     <b class="jq">${esc(jName(n))}</b>
+    ${n.title&&q?`<div class="qsub" style="margin-top:4px">Quest · ${esc(q.name)}</div>`:''}
     <div class="qsub" style="margin-top:6px">${q?`${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}`:'This quest was deleted'}</div>`;
   if((c.lvl||c.xp||c.wait)&&st!=='done')h+=`<div class="qsub" style="margin-top:4px">Needs${c.lvl?' level '+c.lvl:''}${c.xp?' · '+c.xp+' XP':''}${c.wait?' · wait '+c.wait+' min '+(c.from==='prev'?'after the previous step':'after journey start'):''}</div>`;
   why.forEach(w=>{h+=`<div class="qsub jw">${esc(w)}</div>`;});
-  if(st==='open'||st==='done')h+=`<div class="qrow"><button class="btn sm${st==='done'?' ghost':''}" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>${st==='done'?'Replay':'Start'}</button></div>`;
+  if(st==='open')h+=`<div class="qrow"><button class="btn sm" data-act="jshow" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>Show on map</button>${DEV?`<button class="btn ghost sm" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>Start (dev)</button>`:''}</div>`;
+  else if(st==='done'&&DEV)h+=`<div class="qrow"><button class="btn ghost sm" data-act="jstart" data-id="${j.id}" data-n="${n.id}"${R?' disabled':''}>Replay (dev)</button></div>`;
   return h+'</div>';
 }
 function jBlockHTML(j,m,n,depth){
@@ -1378,9 +1411,21 @@ function jSideEditHTML(j,n,depth,idx,len){
   n.subs.forEach((s,i)=>{h+=jSideEditHTML(j,s,depth+1,i,n.subs.length);});
   h+=`<div class="jn side edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${depth?'SUB':'SIDE'}</span>
     <div class="mini"><button data-act="jup" data-n="${n.id}"${idx?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${idx<len-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div></div>
-    <select class="qi sel" data-f="jq" data-n="${n.id}">${jQOpts(n.questId)}</select>${jOptsHTML(n)}
+    <input class="qi" data-f="jtitle" data-n="${n.id}" maxlength="50" placeholder="Title (optional)" value="${esc(n.title||'')}">
+    <select class="qi sel" data-f="jq" data-n="${n.id}" style="margin-top:8px">${jQOpts(n.questId)}</select>${jOptsHTML(n)}
     <div class="qrow"><button class="btn ghost sm" data-act="jsub" data-n="${n.id}">+ Sub-quest first</button></div></div>`;
   return h;
+}
+function poolEditHTML(st){
+  let h=`<div class="jpool"><div class="jlbl" style="color:var(--gold)">Repeatable XP quests · spawn at random places while this is the current stage</div>`;
+  (st.pool||[]).forEach(t=>{
+    h+=`<div class="jn pool edit"><div class="jh"><span class="idx jx">XP</span><div class="mini"><button data-act="jpdel" data-p="${t.id}">×</button></div></div>
+      <input class="qi" data-f="ptn" data-p="${t.id}" maxlength="50" placeholder="Name, e.g. Photograph a tree" value="${esc(t.name||'')}">
+      <div class="jgrid"><label>XP reward<input class="qi num" type="number" min="0" inputmode="numeric" data-f="ptx" data-p="${t.id}" value="${t.xp||''}" placeholder="30"></label>
+      <label>Place label<input class="qi" data-f="ptp" data-p="${t.id}" maxlength="40" placeholder="Quest spot" value="${esc(t.place||'')}"></label></div>
+      <textarea class="qi ta" data-f="ptt" data-p="${t.id}" placeholder="One task per line">${esc((t.tasks||[]).join('\n'))}</textarea></div>`;
+  });
+  return h+`<div class="qrow"><button class="btn ghost sm" data-act="jpool" data-n="${st.id}">+ Add XP quest</button></div></div>`;
 }
 function jeditHTML(){
   const j=JED.j;
@@ -1393,7 +1438,9 @@ function jeditHTML(){
     h+=`<div class="qrow" style="margin-top:8px"><button class="btn ghost sm" data-act="jgate" data-n="${st.id}">+ Side quest to unlock this stage</button></div>`;
     h+=`<div class="jn main edit"><div class="jh"><span class="idx jx">STAGE ${jPad(k+1)}</span>
       <div class="mini"><button data-act="jup" data-n="${st.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${st.id}"${k<j.stages.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${st.id}">×</button></div></div>
-      <select class="qi sel" data-f="jq" data-n="${st.id}">${jQOpts(st.questId)}</select>${jOptsHTML(st)}</div>`;
+      <input class="qi" data-f="jtitle" data-n="${st.id}" maxlength="50" placeholder="Stage title (optional), e.g. The Mountain" value="${esc(st.title||'')}">
+      <select class="qi sel" data-f="jq" data-n="${st.id}" style="margin-top:8px">${jQOpts(st.questId)}</select>${jOptsHTML(st)}</div>`;
+    h+=poolEditHTML(st);
   });
   h+=`<div class="qrow"><button class="btn${j.stages.length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
   h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
@@ -1406,6 +1453,7 @@ function jSave(){
   if(!j.name){toast('Name your journey');const n=$('jName');if(n)n.focus();return;}
   if(!j.stages.length){toast('Add at least one stage');return;}
   if(jSeq(j).some(e=>!jQuest(e.n))){toast('Every step needs a quest');return;}
+  j.stages.forEach(st=>{st.pool=(st.pool||[]).map(t=>({...t,name:(t.name||'').trim()||'XP quest',xp:t.xp>0?t.xp:30})).filter(t=>t.tasks&&t.tasks.length);});
   const k=S.journeys.findIndex(x=>x.id===j.id);
   if(k>=0)S.journeys[k]=j;else S.journeys.push(j);
   /* keep progress only for steps that still exist */
@@ -1436,6 +1484,9 @@ function jClick(b){
     case 'jup':case 'jdown':if(JED){const f=jFind(JED.j,nid);if(f){
       const o=f.i+(a==='jup'?-1:1);
       if(o>=0&&o<f.arr.length){[f.arr[f.i],f.arr[o]]=[f.arr[o],f.arr[f.i]];renderQD();}}}break;
+    case 'jpool':if(JED){const f=jFind(JED.j,nid);if(f){const st=f.arr[f.i];(st.pool=st.pool||[]).push({id:qid(),name:'',xp:30,place:'',tasks:[]});renderQD();}}break;
+    case 'jpdel':if(JED){JED.j.stages.forEach(st=>{st.pool=(st.pool||[]).filter(t=>t.id!==b.dataset.p);});renderQD();}break;
+    case 'jshow':{const pin=PINS.find(x=>x.key===id+':'+nid);if(pin){$('qd').classList.remove('open');showPop(pin,true);}else toast('Not on the map right now');break;}
     case 'jsave':if(JED)jSave();break;
     case 'jdelj':if(JED&&confirm(`Delete "${JED.j.name||'this journey'}"?`)){
       S.journeys=S.journeys.filter(x=>x.id!==JED.j.id);if(S.jprog)delete S.jprog[JED.j.id];save();JED=null;QV={view:'journeys'};renderQD();toast('Journey deleted');}break;
@@ -1444,7 +1495,17 @@ function jClick(b){
 $('qdB').addEventListener('input',e=>{
   if(!JED)return;const t=e.target;
   if(t.id==='jName'){JED.j.name=t.value;return;}
-  const f=t.dataset.f;if(!f||!t.dataset.n||!['jlvl','jxp','jwait'].includes(f))return;
+  if(t.dataset.p){
+    const T=JED.j.stages.flatMap(x=>x.pool||[]).find(x=>x.id===t.dataset.p);if(!T)return;
+    const f2=t.dataset.f;
+    if(f2==='ptn')T.name=t.value;else if(f2==='ptp')T.place=t.value;
+    else if(f2==='ptx')T.xp=Math.max(0,parseInt(t.value,10)||0);
+    else if(f2==='ptt')T.tasks=t.value.split('\n').map(x=>x.trim()).filter(Boolean);
+    return;
+  }
+  const f=t.dataset.f;
+  if(f==='jtitle'&&t.dataset.n){const x=jFind(JED.j,t.dataset.n);if(x)x.arr[x.i].title=t.value;return;}
+  if(!f||!t.dataset.n||!['jlvl','jxp','jwait'].includes(f))return;
   const x=jFind(JED.j,t.dataset.n);if(!x)return;const n=x.arr[x.i];
   n.cond=Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond);
   n.cond[{jlvl:'lvl',jxp:'xp',jwait:'wait'}[f]]=Math.max(0,parseInt(t.value,10)||0);
@@ -1472,6 +1533,86 @@ $('qdB').addEventListener('change',e=>{
 
 
 S.journeys.forEach(j=>{if(!S.jstart||!S.jstart[j.id]){if(!S.jstart)S.jstart={};S.jstart[j.id]=Date.now();}});
+
+/* ================= Map pins: every available quest sits on the map; arrive to start ================= */
+const PWIN=30*60e3,PCELL=0.0035;
+let PINS=[],pinMute=0;const pinMarkers={};
+const hs=str=>[...String(str)].reduce((h,c)=>(h*31+c.charCodeAt(0))|0,7);
+function poolSpawns(now=Date.now()){
+  const out=[],win=Math.floor(now/PWIN);
+  S.journeys.forEach(j=>{
+    const d=jDone(j),si=j.stages.findIndex(s=>!d[s.id]);if(si<0)return;
+    const pool=(j.stages[si].pool||[]).filter(t=>t.tasks&&t.tasks.length);if(!pool.length)return;
+    const ci=Math.floor(player.lat/PCELL);
+    for(let i=ci-3;i<=ci+3;i++){
+      const lngSize=PCELL/Math.cos((i+.5)*PCELL*Math.PI/180),cj=Math.floor(player.lng/lngSize);
+      for(let k=cj-3;k<=cj+3;k++){
+        const rnd=mulberry(hash(i+31337,k+271,win^hs(j.id)));
+        if(rnd()<.14){
+          const t=pool[Math.floor(rnd()*pool.length)],lat=i*PCELL+rnd()*PCELL,lng=k*lngSize+rnd()*lngSize;
+          const id=`pq_${j.id}_${i}_${k}_${win}`;
+          if(S.gone[id]||dist(player,{lat,lng})>700)continue;
+          const q={id:'pool:'+t.id,name:t.name,xp:t.xp,locs:[{name:t.place||'Quest spot',lat,lng,tasks:t.tasks.map(x=>({text:x}))}]};
+          out.push({key:id,kind:'pool',title:t.name,qname:'Repeatable XP quest',lat,lng,xp:questReward(q),places:1,tasks:t.tasks.length,route:0,q,ctx:{pool:id,label:'XP quest',auto:true},stage:si+1,jname:j.name});
+        }
+      }
+    }
+  });
+  return out;
+}
+function jPins(){
+  if(S.active)return [];
+  const out=[];
+  S.journeys.forEach(j=>jAvail(j).forEach(e=>{
+    const q=jQuest(e.n);if(!q||!q.locs.length)return;
+    out.push({key:j.id+':'+e.n.id,kind:e.kind,title:jName(e.n),qname:q.name,lat:q.locs[0].lat,lng:q.locs[0].lng,xp:questReward(q),places:q.locs.length,tasks:questTaskCount(q),route:q.locs.length>1?routeLen(q):0,q,
+      ctx:{jid:j.id,nid:e.n.id,jname:j.name,label:e.kind==='stage'?'Stage '+(e.si+1):'Side quest',auto:true},stage:e.si+1,jname:j.name});
+  }));
+  return out.concat(poolSpawns());
+}
+const pinHTML=(p,near)=>`<div class="jpin ${p.kind}${near?' near':''}"><b>${p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>`;
+function refreshPins(){
+  PINS=(DEV&&ED)?[]:jPins();
+  const keep=new Set(PINS.map(p=>p.key));
+  for(const k in pinMarkers)if(!keep.has(k)){pinMarkers[k].mk.remove();delete pinMarkers[k];}
+  PINS.forEach(p=>{
+    const near=dist(player,p)<=QUEST_RANGE;let o=pinMarkers[p.key];
+    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;showPop(o.pin);},6);o.near=near;pinMarkers[p.key]=o;}
+    else if(o.near!==near){o.near=near;o.el.innerHTML=pinHTML(p,near);}
+    o.pin=p;
+  });
+}
+function pinTick(){
+  if(S.active||PICK||ED||Date.now()<pinMute||(!gotFix&&!SIM))return;
+  const p=PINS.filter(x=>dist(player,x)<=QUEST_RANGE).sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  if(!p)return;
+  closePop();startQuest(p.q.id,p.ctx,p.q);
+}
+function pinLabel(p){return p.kind==='stage'?`Stage ${jPad(p.stage)} · ${p.jname}`:p.kind==='side'?`Side quest · ${p.jname}`:'Repeatable XP quest';}
+function showPop(p,focus){
+  const d=dist(player,p),inR=d<=QUEST_RANGE;
+  $('qpE').textContent=pinLabel(p);
+  $('qpT').textContent=p.title;
+  $('qpS').textContent=p.kind==='pool'?'':'Quest · '+p.qname;
+  $('qpR').innerHTML=`<div><b class="pgold">+${p.xp}</b><span>XP</span></div><div><b>${p.places}</b><span>Places</span></div><div><b>${p.tasks}</b><span>Tasks</span></div><div><b>${fmtD(d)}</b><span>Away</span></div>`;
+  $('qpN').textContent=inR?'You are here. It starts on its own.':`Travel to the marker (within ${QUEST_RANGE} m) and the quest starts automatically.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
+  $('qpB').innerHTML=`<button class="btn sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${DEV?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
+  $('qpop').classList.add('open');
+  if(focus)focusPin(p);
+}
+function closePop(){$('qpop').classList.remove('open');}
+function focusPin(p){
+  document.body.dataset.follow='0';
+  const b=new maplibregl.LngLatBounds([player.lng,player.lat],[player.lng,player.lat]).extend([p.lng,p.lat]);
+  map.fitBounds(b,{padding:{top:170,bottom:260,left:50,right:50},maxZoom:17,duration:900});
+}
+$('qpX').onclick=closePop;
+$('qpop').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;
+  const p=PINS.find(x=>x.key===b.dataset.k);if(!p)return;
+  if(b.dataset.act==='pshow')focusPin(p);
+  else if(b.dataset.act==='pstart'){closePop();startQuest(p.q.id,Object.assign({},p.ctx,{auto:false}),p.q);}
+});
 
 /* ================= Orbit cinematic: map to space ================= */
 const ZH=3.6, FOV=30*Math.PI/180;
