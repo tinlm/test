@@ -211,22 +211,24 @@
   .jwrap{position:relative;width:34px;height:34px}
   .jwrap .jlab{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%);white-space:nowrap;background:#fff;color:#000;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;padding:5px 8px;pointer-events:none;animation:bob 1.2s ease-in-out infinite}
   @keyframes bob{50%{transform:translateX(-50%) translateY(4px)}}
-  .jpin.near{background:#fff;color:#000;border-color:#fff;transform:scale(1.4);z-index:3;box-shadow:0 0 0 3px #000,0 0 22px 6px #ffffff88}
-  .jpin.stage.near{background:var(--gold);color:#000;border-color:var(--gold);transform:rotate(45deg) scale(1.4);box-shadow:0 0 0 3px #000,0 0 24px 7px #d8b45a99}
-  .jpin.item.near{background:var(--ice);border-color:var(--ice)}
+  .jpin.near{background:#fff;color:#000;border-color:#fff;z-index:3;box-shadow:0 0 0 3px #000,0 0 18px 5px #ffffff88}
+  .jpin.stage.near{background:#fff;color:#000;border-color:#fff;box-shadow:0 0 0 3px #000,0 0 20px 6px #ffffff88}
+  .jpin.item.near{background:#000;color:#fff;border-color:#000;transform:scale(1.2);box-shadow:0 0 0 1px #ffffff66}
   .jpin.stage::before,.jpin.side::before,.jpin.stage::after,.jpin.side::after,.jpin.item::after,.jpin.pool::after,.jpin.near::after{content:"";position:absolute;inset:-4px;border:1px solid currentColor;border-radius:inherit;animation:ping 2.2s ease-out infinite;pointer-events:none}
   .jpin.stage::after,.jpin.side::after{animation-delay:1.1s}
   .jpin.stage::before,.jpin.stage::after{border-width:2px}
   .jpin.pool{width:32px;height:32px;margin:1px;border-color:#fff;box-shadow:0 0 0 3px #0008}
   .jpin.pool::after{animation-duration:3s}
-  .jpin.item{border-radius:0;width:34px;height:34px;color:var(--ice);border-color:var(--ice);font-size:18px}
+  .jpin.item{border-radius:0;width:34px;height:34px;color:#fff;background:#000;border:2px solid #000;box-shadow:0 0 0 1px #ffffff55;font-size:18px}
+  .jpin.item::before,.jpin.item::after{display:none!important}
   .jpin.item.pic b{width:100%;height:100%;border-radius:0;overflow:hidden;display:block}
   .jpin.item.pic img{width:100%;height:100%;object-fit:cover;display:block}
   .beast.pic{filter:none;font-size:0}
-  .beast.pic img{width:92px;height:92px;border-radius:0;object-fit:cover;border:1px solid #fff;display:block}
+  .beast.pic img{width:92px;height:92px;border-radius:50%;object-fit:cover;border:1px solid #fff;display:block}
   #qpI{display:none;align-items:center;justify-content:center;margin:0 0 10px;width:84px;height:84px;border-radius:0;border:1px solid var(--hi);overflow:hidden;font-size:44px}
   #qpI img{width:100%;height:100%;object-fit:cover}
-  .card .dimg{width:46px;height:46px;border-radius:0;object-fit:cover;display:block;margin:0 auto 4px}
+  #qpI.round{border-radius:50%}
+  .card .dimg{width:46px;height:46px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 4px}
   .jitems{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
   .jitems summary{font:400 10px var(--mono);letter-spacing:.18em;color:var(--muted);text-transform:uppercase;cursor:pointer}
   .isw{display:flex;align-items:center;gap:10px;margin-top:8px;font:500 14px var(--sans);letter-spacing:.06em}
@@ -408,7 +410,7 @@ const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 /* ================= State ================= */
 const LSC='wildwalk.content',LSP='wildwalk.players';
 const CKEYS=['quests','journeys','items'];            // shared by everyone: what the developer builds
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,runs:[],active:null,jprog:{},jat:{},jstart:{}};
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,runs:[],active:null,jprog:{},jat:{},jstart:{},ipos:{}};
 const readJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
 let PS=readJSON(LSP),CT=readJSON(LSC);
 if(!PS||!CT){   // first launch of this version: the old single save becomes the developer profile
@@ -690,6 +692,7 @@ function startRing(){
 function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
 $('runBtn').onclick=closeCatch;
 function revealItem(it,xp,isNew){
+  $('qpI').classList.add('round');
   $('qpI').innerHTML=it.img?`<img alt="" src="${it.img}">`:`<span>${esc(it.icon||'◆')}</span>`;$('qpI').style.display='flex';
   $('qpE').textContent=isNew?'Item collected':'Item';
   $('qpT').textContent=it.name;$('qpS').textContent=it.text||'';
@@ -1721,6 +1724,20 @@ function poolSpawns(now=Date.now()){
   });
   return out;
 }
+/* Items are anchored once, on the line between where the player is and the quest: the first one a walk away from home, the next closer to the quest, never right on top of it. */
+function itemAnchor(key,idx,n,c){
+  if(!S.ipos)S.ipos={};
+  if(S.ipos[key])return S.ipos[key];
+  if(!gotFix&&!SIM)return null;
+  const P=player,D=dist(P,c),k=idx+1,cnt=n;
+  let sd=D*k/(cnt+1);                                   // distance from the player
+  if(D>=130)sd=Math.max(60,Math.min(sd,350*k,D-70));    // not too close to the player or to the quest
+  const f=D>0?sd/D:0;
+  const rnd=mulberry(hash(hs(key),7,3)),side=(rnd()-.5)*40,dx=c.lng-P.lng,dy=c.lat-P.lat,len=Math.hypot(dx*Math.cos(P.lat*Math.PI/180),dy)||1;
+  const lat=P.lat+dy*f+(dx*Math.cos(P.lat*Math.PI/180)/len)*side/111320;
+  const lng=P.lng+dx*f-(dy/len)*side/(111320*Math.cos(P.lat*Math.PI/180));
+  return (S.ipos[key]={lat,lng});
+}
 function itemSpawns(){
   const out=[];
   S.journeys.forEach(j=>{
@@ -1729,12 +1746,11 @@ function itemSpawns(){
       const n=e.n;if(!n.items||!n.items.length)return;
       const st=jState(j,n,m);if(st!=='open'&&st!=='done')return;      // shows once this quest is unlocked, and stays until collected
       const q=jQuest(n);if(!q||!q.locs.length)return;
-      const c=q.locs[0];
-      n.items.forEach(id=>{
-        const it=(S.items||[]).find(x=>x.id===id);if(!it||S.dex[id])return;
-        const h=hash(hs(n.id),hs(id),11),ang=(h%360)*Math.PI/180,r=45+(h>>>9)%70;      // 45-115 m from the quest: easy to grab on the way
-        const lat=c.lat+r*Math.cos(ang)/111320,lng=c.lng+r*Math.sin(ang)/(111320*Math.cos(c.lat*Math.PI/180));
-        out.push({key:`it_${n.id}_${id}`,kind:'item',item:it,title:it.name,bait:it.bait||'Something is waiting for you here',qname:'',lat,lng,xp:it.xp>0?it.xp:50,places:0,tasks:0,route:0,stage:e.si+1,jname:j.name});
+      const c=q.locs[0],left=n.items.map(id=>(S.items||[]).find(x=>x.id===id)).filter(it=>it);
+      left.forEach((it,idx)=>{
+        if(S.dex[it.id])return;
+        const key=`it_${n.id}_${it.id}`,a=itemAnchor(key,idx,left.length,c);if(!a)return;
+        out.push({key,kind:'item',item:it,title:it.name,bait:it.bait||'Something is waiting for you here',qname:'',lat:a.lat,lng:a.lng,xp:it.xp>0?it.xp:50,places:0,tasks:0,route:0,stage:e.si+1,jname:j.name});
       });
     });
   });
@@ -1751,7 +1767,7 @@ function jPins(){
   }));
   return out.concat(poolSpawns(),items);
 }
-const pinHTML=(p,near)=>`<div class="jwrap"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>${near?`<span class="jlab">${p.kind==='item'?'Tap to collect':'Tap to start'}</span>`:''}</div>`;
+const pinHTML=(p,near)=>`<div class="jwrap"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div></div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
   const keep=new Set(PINS.map(p=>p.key));
@@ -1779,6 +1795,7 @@ function pinTick(){
 function pinLabel(p){return p.kind==='item'?'Mystery item':p.kind==='stage'?`Stage ${jPad(p.stage)} · ${p.jname}`:p.kind==='side'?`Side quest · ${p.jname}`:'Repeatable XP quest';}
 function showPop(p,focus){
   const d=dist(player,p),inR=d<=CATCH_RANGE,item=p.kind==='item';
+  $('qpI').classList.remove('round');
   if(item){$('qpI').innerHTML=p.item.img?`<img alt="" src="${p.item.img}">`:`<span>${esc(p.item.icon||'◆')}</span>`;$('qpI').style.display='flex';}
   else $('qpI').style.display='none';
   $('qpE').textContent=pinLabel(p);
