@@ -24,6 +24,7 @@
   .hud{position:absolute;top:0;left:0;right:0;z-index:1000;padding:max(10px,env(safe-area-inset-top)) 10px 0;pointer-events:none}
   .panel{pointer-events:auto;background:#000d;border:1px solid var(--hi);padding:9px 12px 8px;backdrop-filter:blur(6px)}
   .r1{display:flex;align-items:center;gap:12px}
+  .orbs{display:none}
   .lvl,.orbs{font:500 12px var(--mono);letter-spacing:.18em;white-space:nowrap}
   .bar{flex:1;height:2px;background:#ffffff26}
   .bar i{display:block;height:100%;width:0;background:#fff;transition:width .4s}
@@ -207,10 +208,16 @@
   .jpin.stage b{transform:rotate(-45deg);font-weight:500}
   .jpin.side{border-style:dashed}
   .jpin.pool{border-radius:50%;width:28px;height:28px;font-size:17px}
+  .jwrap{position:relative;width:34px;height:34px}
+  .jwrap .jlab{position:absolute;top:calc(100% + 14px);left:50%;transform:translateX(-50%);white-space:nowrap;background:#fff;color:#000;font:600 10px var(--mono);letter-spacing:.16em;text-transform:uppercase;padding:5px 8px;pointer-events:none;animation:bob 1.2s ease-in-out infinite}
+  @keyframes bob{50%{transform:translateX(-50%) translateY(4px)}}
+  .jpin.near{background:#fff;color:#000;border-color:#fff;transform:scale(1.4);z-index:3;box-shadow:0 0 0 3px #000,0 0 22px 6px #ffffff88}
+  .jpin.stage.near{background:var(--gold);color:#000;border-color:var(--gold);transform:rotate(45deg) scale(1.4);box-shadow:0 0 0 3px #000,0 0 24px 7px #d8b45a99}
+  .jpin.item.near{background:var(--ice);border-color:var(--ice)}
   .jpin.stage::before,.jpin.side::before,.jpin.stage::after,.jpin.side::after,.jpin.item::after,.jpin.pool::after,.jpin.near::after{content:"";position:absolute;inset:-4px;border:1px solid currentColor;border-radius:inherit;animation:ping 2.2s ease-out infinite;pointer-events:none}
   .jpin.stage::after,.jpin.side::after{animation-delay:1.1s}
   .jpin.stage::before,.jpin.stage::after{border-width:2px}
-  .jpin.pool{width:32px;height:32px;border-color:#fff;box-shadow:0 0 0 3px #0008}
+  .jpin.pool{width:32px;height:32px;margin:1px;border-color:#fff;box-shadow:0 0 0 3px #0008}
   .jpin.pool::after{animation-duration:3s}
   .jpin.item{border-radius:50%;width:34px;height:34px;color:var(--ice);border-color:var(--ice);font-size:18px}
   .jpin.item.pic b{width:100%;height:100%;border-radius:50%;overflow:hidden;display:block}
@@ -220,6 +227,8 @@
   #qpI{display:none;align-items:center;justify-content:center;margin:0 0 10px;width:84px;height:84px;border-radius:50%;border:1px solid var(--hi);overflow:hidden;font-size:44px}
   #qpI img{width:100%;height:100%;object-fit:cover}
   .card .dimg{width:46px;height:46px;border-radius:50%;object-fit:cover;display:block;margin:0 auto 4px}
+  .jitems{margin-top:10px;border-top:1px dashed var(--line);padding-top:8px}
+  .jitems summary{font:400 10px var(--mono);letter-spacing:.18em;color:var(--muted);text-transform:uppercase;cursor:pointer}
   .isw{display:flex;align-items:center;gap:10px;margin-top:8px;font:500 14px var(--sans);letter-spacing:.06em}
   .isw input{width:20px;height:20px;accent-color:#fff}
   .ithumb{width:64px;height:64px;border-radius:50%;border:1px solid var(--hi);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;flex:none}
@@ -294,7 +303,7 @@
   <div class="r1">
     <div class="lvl" id="lvl">LV 01</div>
     <div class="bar"><i id="xpbar"></i></div>
-    <div class="orbs" id="orbs">ORB 10</div>
+    
   </div>
   <div class="mh"><span id="mhl">Missions</span><span id="mode">LOCATING</span></div>
   <div class="mq" id="mq"><span class="t" id="mt">Scanning for missions</span><span class="d" id="md"></span></div>
@@ -663,14 +672,13 @@ function setBeast(pin){
 function openCatch(pin){
   closePop();
   const item=pin.kind==='item';
-  cur={pin,misses:0,speed:item?1100:1300,tol:item?15:18};
+  cur={pin,misses:0,speed:1100,tol:15};
   $('cName').textContent=item?'Mystery item':pin.title;
   $('cSub').textContent=item?(pin.bait||'Something is waiting here'):pinLabel(pin);
   setBeast(pin);
   $('cTip').textContent=item?'Throw when the ring meets the dashed circle':'Throw when the ring meets the dashed circle to start the quest';
   $('target').style.width=$('target').style.height=TARGET_R*2+'px';
   $('catch').classList.add('open');startRing();updateHud();
-  if(S.orbs<=0)$('cTip').textContent='No orbs left. Find a supply cache or a stop.';
 }
 function startRing(){
   cancelAnimationFrame(raf);const t0=performance.now();
@@ -681,10 +689,6 @@ function startRing(){
 }
 function closeCatch(){cancelAnimationFrame(raf);$('catch').classList.remove('open');cur=null;refresh();}
 $('runBtn').onclick=closeCatch;
-function nearestSupply(){
-  const now=Date.now(),pool=stops.filter(s=>(S.stopCd[s.id]||0)<now-STOP_COOLDOWN).concat(suppliesAround(player,now));
-  return pool.map(s=>({s,d:dist(player,s)})).sort((a,b)=>a.d-b.d)[0]||null;
-}
 function revealItem(it,xp,isNew){
   $('qpI').innerHTML=it.img?`<img alt="" src="${it.img}">`:`<span>${esc(it.icon||'◆')}</span>`;$('qpI').style.display='flex';
   $('qpE').textContent=isNew?'Item collected':'Item';
@@ -696,8 +700,6 @@ function revealItem(it,xp,isNew){
 $('throwBtn').onclick=()=>{
   if(!cur)return;
   const pin=cur.pin,item=pin.kind==='item';
-  if(S.orbs<=0){const n=nearestSupply();toast(`Out of orbs<small>${n?'Nearest supply '+fmtD(n.d)+' away':'Visit a stop or supply cache'}</small>`,3200);closeCatch();return;}
-  S.orbs--;
   const off=Math.abs(ringR-TARGET_R);
   if(off<=cur.tol){
     const great=off<=cur.tol/3;
@@ -711,14 +713,13 @@ $('throwBtn').onclick=()=>{
       else if(level(S.xp)>old)toast(`Level ${level(S.xp)}`,2200);
     }else{
       closeCatch();updateHud();
-      startQuest(pin.q.id,Object.assign({},pin.ctx,{auto:true}),pin.q);
+      startFromPin(pin);
     }
     return;
   }
   cur.misses++;vib(80);
   if(cur.misses>=3){
-    if(item){S.gone[pin.key]=Date.now();toast('It slipped away<small>It may come back later</small>');}
-    else toast('Missed<small>Tap the marker to try again</small>');
+    toast('It slipped away<small>Tap it to try again</small>');
     save();closeCatch();
   }else{$('cTip').textContent=`Missed · ${3-cur.misses} attempts left`;save();}
   updateHud();
@@ -772,6 +773,7 @@ async function maybeFetchStops(){
 /* supply caches: generated around you, refresh every 30 minutes, independent of OpenStreetMap */
 const SWIN=30*60e3,SCELL=0.0030;
 function suppliesAround(c,now=Date.now()){
+  return [];
   const win=Math.floor(now/SWIN),out=[],ci=Math.floor(c.lat/SCELL);
   for(let i=ci-4;i<=ci+4;i++){
     const latC=(i+.5)*SCELL,lngSize=SCELL/Math.cos(latC*Math.PI/180),cj=Math.floor(c.lng/lngSize);
@@ -813,12 +815,12 @@ function tapStop(s){
     const left=STOP_COOLDOWN-(Date.now()-(S.stopCd[s.id]||0));
     if(left>0){toast(`${esc(s.name)}<small>Recharging · ${Math.ceil(left/60000)} min</small>`);return;}
   }
-  const lv=level(S.xp),n=3+Math.floor(Math.random()*3)+Math.floor(lv/5),xp=s.supply?20:25;
-  S.orbs+=n;S.xp+=xp;
+  const xp=s.supply?20:25;
+  S.xp+=xp;
   if(s.supply)S.gone[s.id]=Date.now();else S.stopCd[s.id]=Date.now();
   save();vib(60);
   const note=missionEvent('visit',{id:s.id});
-  toast(`${esc(s.name)}<small>+${n} orbs · +${xp} XP${note?' · '+note:''}</small>`,3000);
+  toast(`${esc(s.name)}<small>+${xp} XP${note?' · '+note:''}</small>`,3000);
   updateHud();refreshStops();
 }
 
@@ -890,7 +892,6 @@ function updateHud(){
   const l=level(S.xp),a=lvStart(l),b=lvStart(l+1);
   $('lvl').textContent='LV '+String(l).padStart(2,'0');
   $('xpbar').style.width=((S.xp-a)/(b-a)*100)+'%';
-  $('orbs').textContent='ORB '+S.orbs;
   save();
 }
 function renderDex(){
@@ -1338,6 +1339,8 @@ function jWhy(j,n,m){
   if(block)why.push('Finish first: '+(block.gate?'Stage '+jPad(j.stages.indexOf(block)+1)+' · ':'')+jName(block));
   const open=jKidsOf(n).filter(k=>!d[k.id]);
   if(open.length)why.push((jOrd(n)==='free'?'Do first (any order): ':'Do first: ')+open.map(jName).join(', '));
+  const need=(n.needItems||[]).filter(id=>!S.dex[id]).map(id=>{const it=(S.items||[]).find(x=>x.id===id);return it?it.name:null;}).filter(Boolean);
+  if(need.length)why.push('Collect: '+need.join(', '));
   const c0=jCond(n),xp=S.xp||0;
   if(c0.lvl>0&&level(xp)<c0.lvl)why.push(`Reach level ${c0.lvl}`);
   if(c0.xp>0&&xp<c0.xp)why.push(`Earn ${c0.xp} XP total`);
@@ -1474,7 +1477,7 @@ function jSideEditHTML(j,n,depth,idx,len){
   h+=`<div class="jn side edit" style="margin-left:${depth*14}px"><div class="jh"><span class="idx jx">${depth?'SUB':'SIDE'}</span>
     <div class="mini"><button data-act="jup" data-n="${n.id}"${idx?'':' disabled'}>↑</button><button data-act="jdown" data-n="${n.id}"${idx<len-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${n.id}">×</button></div></div>
     <input class="qi" data-f="jtitle" data-n="${n.id}" maxlength="50" placeholder="Title (optional)" value="${esc(n.title||'')}">
-    <select class="qi sel" data-f="jq" data-n="${n.id}" style="margin-top:8px">${jQOpts(n.questId)}</select>${jOptsHTML(n)}
+    <select class="qi sel" data-f="jq" data-n="${n.id}" style="margin-top:8px">${jQOpts(n.questId)}</select>${jOptsHTML(n)}${nodeItemsHTML(n)}
     <div class="qrow"><button class="btn ghost sm" data-act="jsub" data-n="${n.id}">+ Sub-quest first</button></div></div>`;
   return h;
 }
@@ -1501,8 +1504,8 @@ function jeditHTML(){
     h+=`<div class="jn main edit"><div class="jh"><span class="idx jx">STAGE ${jPad(k+1)}</span>
       <div class="mini"><button data-act="jup" data-n="${st.id}"${k?'':' disabled'}>↑</button><button data-act="jdown" data-n="${st.id}"${k<j.stages.length-1?'':' disabled'}>↓</button><button data-act="jdel" data-n="${st.id}">×</button></div></div>
       <input class="qi" data-f="jtitle" data-n="${st.id}" maxlength="50" placeholder="Stage title (optional), e.g. The Mountain" value="${esc(st.title||'')}">
-      <select class="qi sel" data-f="jq" data-n="${st.id}" style="margin-top:8px">${jQOpts(st.questId)}</select>${jOptsHTML(st)}</div>`;
-    h+=poolEditHTML(st)+stageItemsHTML(st);
+      <select class="qi sel" data-f="jq" data-n="${st.id}" style="margin-top:8px">${jQOpts(st.questId)}</select>${jOptsHTML(st)}${nodeItemsHTML(st)}</div>`;
+    h+=poolEditHTML(st);
   });
   h+=`<div class="qrow"><button class="btn${j.stages.length?' ghost':''} sm" data-act="jstage" style="flex:1">+ Add stage</button></div>`;
   h+=`<div class="qrow"><button class="btn" data-act="jsave" style="flex:1">Save journey</button>${JED.isNew?'':'<button class="btn ghost sm" data-act="jdelj">Delete</button>'}</div>`;
@@ -1516,7 +1519,11 @@ function jSave(){
   if(!j.stages.length){toast('Add at least one stage');return;}
   if(jSeq(j).some(e=>!jQuest(e.n))){toast('Every step needs a quest');return;}
   for(const st of j.stages){for(const t of (st.pool||[])){if(!t.tasks||!t.tasks.length){toast(`XP quest "${esc((t.name||'').trim()||'unnamed')}" needs at least one task<small>Type one task per line</small>`,3600);return;}}}
-  j.stages.forEach(st=>{st.pool=(st.pool||[]).map(t=>({...t,name:(t.name||'').trim()||'XP quest',xp:t.xp>0?t.xp:30}));st.items=(st.items||[]).filter(id=>(S.items||[]).some(x=>x.id===id));});
+  j.stages.forEach(st=>{st.pool=(st.pool||[]).map(t=>({...t,name:(t.name||'').trim()||'XP quest',xp:t.xp>0?t.xp:30}));});
+  const ok=id=>(S.items||[]).some(x=>x.id===id);
+  for(const e of jSeq(j)){e.n.items=(e.n.items||[]).filter(ok);e.n.needItems=(e.n.needItems||[]).filter(ok);
+    const bad=e.n.items.find(id=>e.n.needItems.includes(id));
+    if(bad){toast(`"${esc(jName(e.n))}" needs an item that only appears once it is unlocked<small>Pick a different item or quest</small>`,4200);return;}}
   const k=S.journeys.findIndex(x=>x.id===j.id);
   if(k>=0)S.journeys[k]=j;else S.journeys.push(j);
   /* keep progress only for steps that still exist */
@@ -1579,7 +1586,7 @@ $('qdB').addEventListener('change',e=>{
   if(f==='jq')n.questId=t.value;
   else if(f==='jord')n.order=t.value;
   else if(f==='jfrom')n.cond=Object.assign({lvl:0,xp:0,wait:0,from:'start'},n.cond,{from:t.value});
-  else if(f==='sitem'){const st=n;st.items=(st.items||[]).filter(x=>x!==t.dataset.i);if(t.checked)st.items.push(t.dataset.i);return;}
+  else if(f==='nitem'||f==='nreq'){const key=f==='nitem'?'items':'needItems';n[key]=(n[key]||[]).filter(x=>x!==t.dataset.i);if(t.checked)n[key].push(t.dataset.i);return;}
   else return;
   renderQD();
 });
@@ -1667,6 +1674,19 @@ $('qdB').addEventListener('change',async e=>{
   const d=await readPic(t.files[0]);
   if(d){IED.it.img=d;renderQD();}else toast('Could not read that picture');
 });
+function nodeItemsHTML(n){
+  const its=S.items||[];
+  const a=(n.items||[]).length,b=(n.needItems||[]).length;
+  let h=`<details class="jitems"><summary>Items · ${a} appear · ${b} required</summary>`;
+  if(!its.length)h+=`<div class="qsub" style="margin-top:6px">No items yet. Create some in the Items tab.</div>`;
+  else{
+    h+=`<div class="jlbl" style="color:var(--ice)">Appear on the map near this quest once it is unlocked</div>`;
+    its.forEach(it=>{h+=`<label class="isw"><input type="checkbox" data-f="nitem" data-n="${n.id}" data-i="${it.id}"${(n.items||[]).includes(it.id)?' checked':''}>${esc(it.name||'Unnamed')}</label>`;});
+    h+=`<div class="jlbl" style="color:var(--gold);margin-top:12px">Player must have collected these to unlock this quest</div>`;
+    its.forEach(it=>{h+=`<label class="isw"><input type="checkbox" data-f="nreq" data-n="${n.id}" data-i="${it.id}"${(n.needItems||[]).includes(it.id)?' checked':''}>${esc(it.name||'Unnamed')}</label>`;});
+  }
+  return h+'</details>';
+}
 function stageItemsHTML(st){
   const its=S.items||[];
   let h=`<div class="jpool"><div class="jlbl" style="color:var(--ice)">Items that spawn here · once each</div>`;
@@ -1701,49 +1721,55 @@ function poolSpawns(now=Date.now()){
   });
   return out;
 }
-function itemSpawns(now=Date.now()){
-  const out=[],win=Math.floor(now/IWIN);
+function itemSpawns(){
+  const out=[];
   S.journeys.forEach(j=>{
-    const d=jDone(j),si=j.stages.findIndex(s=>!d[s.id]);if(si<0)return;
-    const its=(j.stages[si].items||[]).map(id=>(S.items||[]).find(x=>x.id===id)).filter(it=>it&&!S.dex[it.id]);
-    if(!its.length)return;
-    const ci=Math.floor(player.lat/PCELL);
-    for(let i=ci-4;i<=ci+4;i++){
-      const lngSize=PCELL/Math.cos((i+.5)*PCELL*Math.PI/180),cj=Math.floor(player.lng/lngSize);
-      for(let k=cj-4;k<=cj+4;k++){
-        const rnd=mulberry(hash(i+7001,k+977,win^hs(j.id)));
-        if(rnd()<.05){
-          const it=its[Math.floor(rnd()*its.length)],lat=i*PCELL+rnd()*PCELL,lng=k*lngSize+rnd()*lngSize,id=`it_${it.id}_${i}_${k}_${win}`;
-          if(S.gone[id]||dist(player,{lat,lng})>650)continue;
-          out.push({key:id,kind:'item',item:it,title:it.name,bait:it.bait||'Something is waiting for you here',qname:'',lat,lng,xp:it.xp>0?it.xp:50,places:0,tasks:0,route:0,stage:si+1,jname:j.name});
-        }
-      }
-    }
+    const m=jIdx(j);
+    jSeq(j).forEach(e=>{
+      const n=e.n;if(!n.items||!n.items.length)return;
+      const st=jState(j,n,m);if(st!=='open'&&st!=='done')return;      // shows once this quest is unlocked, and stays until collected
+      const q=jQuest(n);if(!q||!q.locs.length)return;
+      const c=q.locs[0];
+      n.items.forEach(id=>{
+        const it=(S.items||[]).find(x=>x.id===id);if(!it||S.dex[id])return;
+        const h=hash(hs(n.id),hs(id),11),ang=(h%360)*Math.PI/180,r=45+(h>>>9)%70;      // 45-115 m from the quest: easy to grab on the way
+        const lat=c.lat+r*Math.cos(ang)/111320,lng=c.lng+r*Math.sin(ang)/(111320*Math.cos(c.lat*Math.PI/180));
+        out.push({key:`it_${n.id}_${id}`,kind:'item',item:it,title:it.name,bait:it.bait||'Something is waiting for you here',qname:'',lat,lng,xp:it.xp>0?it.xp:50,places:0,tasks:0,route:0,stage:e.si+1,jname:j.name});
+      });
+    });
   });
   return out;
 }
 function jPins(){
-  if(S.active)return [];
+  const items=itemSpawns();
+  if(S.active)return items;
   const out=[];
   S.journeys.forEach(j=>jAvail(j).forEach(e=>{
     const q=jQuest(e.n);if(!q||!q.locs.length)return;
     out.push({key:j.id+':'+e.n.id,kind:e.kind,title:jName(e.n),qname:q.name,lat:q.locs[0].lat,lng:q.locs[0].lng,xp:questReward(q),places:q.locs.length,tasks:questTaskCount(q),route:q.locs.length>1?routeLen(q):0,q,
       ctx:{jid:j.id,nid:e.n.id,jname:j.name,label:e.kind==='stage'?'Stage '+(e.si+1):'Side quest',auto:true},stage:e.si+1,jname:j.name});
   }));
-  return out.concat(poolSpawns(),itemSpawns());
+  return out.concat(poolSpawns(),items);
 }
-const pinHTML=(p,near)=>`<div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>`;
+const pinHTML=(p,near)=>`<div class="jwrap"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div>${near?`<span class="jlab">${p.kind==='item'?'Tap to collect':'Tap to start'}</span>`:''}</div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
   const keep=new Set(PINS.map(p=>p.key));
   for(const k in pinMarkers)if(!keep.has(k)){pinMarkers[k].mk.remove();delete pinMarkers[k];}
   PINS.forEach(p=>{
     const near=dist(player,p)<=CATCH_RANGE;let o=pinMarkers[p.key];
-    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;const q=o.pin;if(dist(player,q)<=CATCH_RANGE)openCatch(q);else showPop(q);},6);o.near=near;pinMarkers[p.key]=o;}
+    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;tapPin(o.pin);},6);o.near=near;pinMarkers[p.key]=o;}
     else if(o.near!==near){o.near=near;o.el.innerHTML=pinHTML(p,near);}
     o.pin=p;
   });
 }
+function tapPin(p){
+  if(PICK)return;
+  if(S.active&&p.kind!=='item'){toast('Quest in progress<small>Finish or abort it first</small>');return;}
+  if(dist(player,p)<=CATCH_RANGE){if(p.kind==='item')openCatch(p);else startFromPin(p);}
+  else showPop(p);
+}
+function startFromPin(p){closePop();startQuest(p.q.id,Object.assign({},p.ctx,{auto:true}),p.q);}
 function pinTick(){
   if(S.active||PICK||ED||Date.now()<pinMute||(!gotFix&&!SIM))return;
   const p=PINS.filter(x=>dist(player,x)<=QUEST_RANGE).sort((a,b)=>dist(player,a)-dist(player,b))[0];
@@ -1759,7 +1785,7 @@ function showPop(p,focus){
   $('qpT').textContent=item?p.bait:p.title;
   $('qpS').textContent=item||p.kind==='pool'?'':'Quest · '+p.qname;
   $('qpR').innerHTML=`<div><b class="pgold">+${p.xp}</b><span>XP</span></div>${item?'':`<div><b>${p.places}</b><span>Places</span></div><div><b>${p.tasks}</b><span>Tasks</span></div>`}<div><b>${fmtD(d)}</b><span>Away</span></div>`;
-  $('qpN').textContent=inR?(item?'You are close. Tap Collect and throw an orb.':'You are close. Tap Start and throw an orb to begin.'):`Get within ${CATCH_RANGE} m of the marker, tap it and throw an orb ${item?'to collect it':'to start'}.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
+  $('qpN').textContent=inR?(item?'You are close. Tap Collect.':'You are here. Tap Start.'):`Get within ${CATCH_RANGE} m of the marker, tap it ${item?'and throw to collect it':'to start the quest'}.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
   $('qpB').innerHTML=`<button class="btn sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${inR?`<button class="btn sm" data-act="pcatch" data-k="${esc(p.key)}">${item?'Collect':'Start'}</button>`:''}${DEV&&!item?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
   $('qpop').classList.add('open');
   if(focus)focusPin(p);
@@ -1775,7 +1801,7 @@ $('qpop').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const p=PINS.find(x=>x.key===b.dataset.k);if(!p)return;
   if(b.dataset.act==='pshow')focusPin(p);
-  else if(b.dataset.act==='pcatch')openCatch(p);
+  else if(b.dataset.act==='pcatch'){if(p.kind==='item')openCatch(p);else startFromPin(p);}
   else if(b.dataset.act==='pstart'){closePop();startQuest(p.q.id,Object.assign({},p.ctx,{auto:false}),p.q);}
 });
 
