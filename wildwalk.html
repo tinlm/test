@@ -209,15 +209,16 @@
   .jpin.stage,.jpin.side{border-style:dashed}
   .jpin b{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:400;line-height:1}
   .jpin svg{display:block;width:12px;height:12px;fill:currentColor}
-  .jpin.pool{border-radius:50%;width:22px;height:22px;margin:2px;font-size:14px}
-  .jpin.item{border-radius:0;color:#fff;background:#000;border:2px solid #000;box-shadow:0 0 0 1px #ffffff55;font-size:14px}
+  .jpin.pool{border-style:dashed;width:20px;height:20px;margin:3px}
+  .jpin.pool b{font:600 8px var(--mono);letter-spacing:0;text-indent:0}
+  .jpin.item{border-radius:0;color:#fff;background:#000;border:1px dashed #fff;font-size:14px}
   /* quests: one ring that leaves the border, same speed as the current-location ring */
-  .jpin.stage::after,.jpin.side::after,.jpin.pool::after{content:"";position:absolute;inset:0;border:1px solid #fff;border-radius:0;animation:pingq 2.4s ease-out infinite;pointer-events:none}
+  .jpin.sel::after{content:"";position:absolute;inset:0;border:1px solid #fff;border-radius:0;animation:pingq 2.4s ease-out infinite;pointer-events:none}
   @keyframes pingq{from{transform:scale(.3);opacity:.9}to{transform:scale(2.5);opacity:0}}
   /* in range: the marker hovers and a dashed reticle turns around it */
   .jpin.near:not(.item){background:#fff;color:#000}
-  .jpin.pool::after{border-radius:50%}
-  .jpin.item.near{box-shadow:0 0 0 1px #ffffff99,0 0 10px 2px #ffffff55}
+  .qsel{display:inline-block;margin-left:8px;font:600 9px var(--mono);letter-spacing:.16em;padding:3px 6px;background:#fff;color:#000;vertical-align:middle}
+  .jpin.item.near{border-style:solid}
   @media (prefers-reduced-motion:reduce){.jpin::after,.jwrap{animation:none!important}}
   .jpin.item.pic b{width:100%;height:100%;border-radius:0;overflow:hidden;display:block}
   .jpin.item.pic img{width:100%;height:100%;object-fit:cover;display:block}
@@ -392,7 +393,7 @@
 const LS='wildwalk.v1';
 const CATCH_RANGE=50, STOP_RANGE=50, STOP_COOLDOWN=3*60e3;
 const WINDOW=15*60e3, CELL=0.0018;
-const DEFAULT_POS={lat:45.815,lng:15.982};
+const DEFAULT_POS=(()=>{try{const v=JSON.parse(localStorage.getItem('wildwalk.lastfix')||'null');if(v&&isFinite(v.lat)&&isFinite(v.lng))return {lat:v.lat,lng:v.lng};}catch(e){}return {lat:45.815,lng:15.982};})();
 
 const SPECIES=[
  {n:'Mossling',e:'🌿',r:1},{n:'Puddlepip',e:'🐸',r:1},{n:'Bumbleroot',e:'🐝',r:1},{n:'Pebblet',e:'🪨',r:1},
@@ -408,7 +409,7 @@ const pips=r=>'●'.repeat(r)+'○'.repeat(4-r);
 /* ================= State ================= */
 const LSC='wildwalk.content',LSP='wildwalk.players';
 const CKEYS=['quests','journeys','items'];            // shared by everyone: what the developer builds
-const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,runs:[],active:null,jprog:{},jat:{},jstart:{},ipos:{}};
+const def={xp:0,orbs:10,dex:{},gone:{},stopCd:{},mission:null,mIdx:0,runs:[],active:null,jprog:{},jat:{},jstart:{},ipos:{},sel:null};
 const readJSON=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
 let PS=readJSON(LSP),CT=readJSON(LSC);
 if(!PS||!CT){   // first launch of this version: the old single save becomes the developer profile
@@ -593,6 +594,7 @@ function hideGate(){$('gate').classList.remove('open');}
 function onGPS(p){
   if(SIM)return;
   const first=!gotFix;gotFix=true;hideGate();
+  if(!onGPS.t||Date.now()-onGPS.t>3000){onGPS.t=Date.now();try{localStorage.setItem('wildwalk.lastfix',JSON.stringify({lat:p.coords.latitude,lng:p.coords.longitude}));}catch(e){}}
   setPlayer(p.coords.latitude,p.coords.longitude,!first&&document.body.dataset.follow==='1');
   if(first)map.jumpTo({center:[player.lng,player.lat],zoom:17});
 }
@@ -747,29 +749,7 @@ async function fetchOverpass(q){
   }
   return null;
 }
-async function maybeFetchStops(){
-  if(fetching)return;
-  if(lastFetch&&dist(player,lastFetch)<350)return;
-  const key='ww.stops2.'+player.lat.toFixed(3)+'.'+player.lng.toFixed(3);
-  try{
-    const c=JSON.parse(localStorage.getItem(key)||'null');
-    if(c&&Date.now()-c.t<12*3600e3&&c.d&&c.d.length){stops=c.d;lastFetch={...player};stopsReady=true;refreshStops();ensureMission();return;}
-  }catch(e){}
-  fetching=true;
-  const j=await fetchOverpass(overpassQuery());
-  if(j&&j.elements){
-    stops=j.elements.map(e=>{
-      const la=e.lat!=null?e.lat:(e.center&&e.center.lat),lo=e.lon!=null?e.lon:(e.center&&e.center.lon);
-      return la==null?null:{id:e.type[0]+e.id,lat:la,lng:lo,name:(e.tags&&e.tags.name)||'Landmark',e:stopEmoji(e.tags||{})};
-    }).filter(Boolean);
-    try{localStorage.setItem(key,JSON.stringify({t:Date.now(),d:stops}));}catch(_){}
-    lastFetch={...player};
-  }else{
-    if(!warned){warned=true;toast('Could not load places<small>Supply caches still work</small>',2800);}
-    clearTimeout(retryT);retryT=setTimeout(()=>{lastFetch=null;maybeFetchStops();},45000);
-  }
-  fetching=false;stopsReady=true;refreshStops();ensureMission();
-}
+function maybeFetchStops(){stopsReady=true;}   // public places are switched off for now
 
 /* supply caches: generated around you, refresh every 30 minutes, independent of OpenStreetMap */
 const SWIN=30*60e3,SCELL=0.0030;
@@ -794,20 +774,7 @@ function suppliesAround(c,now=Date.now()){
   return out;
 }
 const stopHTML=(s,cd,near,tgt)=>`<div class="stop${s.supply?' supply':''}${cd?' cd':''}${near&&!cd?' near':''}${tgt?' target':''}"><b>${s.e}</b></div>`;
-function refreshStops(){
-  const now=Date.now(),m=S.mission;
-  const list=stops.filter(s=>dist(player,s)<1500).concat(suppliesAround(player,now));
-  if(m&&m.type==='visit'&&!list.find(x=>x.id===m.id)&&!(m.supply&&S.gone[m.id]))list.push({id:m.id,lat:m.lat,lng:m.lng,name:m.name,e:m.e,supply:!!m.supply});
-  const ids=new Set(list.map(s=>s.id));
-  for(const id in stopMarkers)if(!ids.has(id)){stopMarkers[id].mk.remove();delete stopMarkers[id];}
-  for(const s of list){
-    const cd=!s.supply&&(S.stopCd[s.id]||0)>now-STOP_COOLDOWN,near=dist(player,s)<=STOP_RANGE,tgt=!!(m&&m.type==='visit'&&m.id===s.id);
-    const key=''+cd+near+tgt;
-    let o=stopMarkers[s.id];
-    if(!o){o=mkMarker(stopHTML(s,cd,near,tgt),s.lng,s.lat,()=>tapStop(s));o.key=key;stopMarkers[s.id]=o;}
-    else if(o.key!==key){o.key=key;o.el.innerHTML=stopHTML(s,cd,near,tgt);}
-  }
-}
+function refreshStops(){for(const id in stopMarkers){stopMarkers[id].mk.remove();delete stopMarkers[id];}}
 function tapStop(s){
   if(PICK){addPick(s.lat,s.lng,s.supply?null:s.name);return;}
   const d=dist(player,s);
@@ -835,6 +802,7 @@ function visitCandidates(maxD){
 function newMission(){
   const type=mType(S.mIdx);
   if(type==='visit'){
+    S.mIdx++;return null;   // places are off: go straight on to the next kind of mission
     let c=visitCandidates(1500);
     if(!c.length)c=visitCandidates(3000);
     if(c.length){
@@ -849,6 +817,7 @@ function newMission(){
   return null;
 }
 function ensureMission(){
+  if(S.mission&&S.mission.type==='visit')S.mission=null;
   if(S.mission&&S.mission.type==='visit'&&dist(player,S.mission)>2500)S.mission=null;
   if(!S.mission){
     if(mType(S.mIdx)==='visit'&&!stopsReady)return;
@@ -870,8 +839,8 @@ function missionEvent(kind,data){
 }
 function renderMission(){
   if(S.active){questLine();return;}
-  const t=$('mt'),d=$('md'),np=PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b))[0];
-  if(np){$('mhl').textContent=pinLabel(np).split(' · ')[0];t.textContent='Travel to '+np.title;const x=dist(player,np);d.textContent=x<=CATCH_RANGE?'IN RANGE':fmtD(x);return;}
+  const t=$('mt'),d=$('md'),np=missionTarget();
+  if(np){$('mhl').textContent=(S.sel===np.key?'Selected · ':'')+pinLabel(np).split(' · ')[0];t.textContent='Travel to '+np.title;const x=dist(player,np);d.textContent=x<=CATCH_RANGE?'IN RANGE':fmtD(x);return;}
   $('mhl').textContent='Missions';
   const m=S.mission;
   if(!m){t.textContent='Scanning for missions';d.textContent='';return;}
@@ -882,7 +851,7 @@ function renderMission(){
 }
 $('mq').onclick=()=>{
   if(S.active){if(S.active.phase==='tasks')openSheet();else focusTarget();return;}
-  const np=PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b))[0];
+  const np=missionTarget();
   if(np){showPop(np,true);return;}
   const m=S.mission;
   if(m&&m.type==='visit'){document.body.dataset.follow='0';map.easeTo({center:[m.lng,m.lat],duration:700});}
@@ -1166,7 +1135,8 @@ function listHTML(){
       <div class="qsub">Place ${R.idx+1}/${R.locs.length} · ${st.done}/${st.tasks} tasks · ${fmtT(st.dur)}</div>
       <div class="qrow"><button class="btn sm" data-act="${R.phase==='tasks'?'sheet':'focus'}">${R.phase==='tasks'?'Open checklist':'Show on map'}</button><button class="btn ghost sm" data-act="abort">Abort quest</button></div></div>`;
   }
-  if(DEV)h+=`<div class="qrow"><button class="btn sm" data-act="new" style="flex:1">+ New quest</button></div>`;
+  if(!DEV)return playerListHTML(h);
+  h+=`<div class="qrow"><button class="btn sm" data-act="new" style="flex:1">+ New quest</button></div>`;
   h+=`<div class="qh3">Quests</div>`;
   if(!S.quests.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">${DEV?'No quests yet. Tap New quest to build one.':'No quests yet. A developer builds them (switch in Orbit).'}</div>`;
   S.quests.forEach(q=>{
@@ -1180,6 +1150,36 @@ function listHTML(){
   if(!S.runs.length)h+=`<div class="qsub" style="margin-top:8px">Every quest you start is logged here.</div>`;
   S.runs.forEach(r=>{h+=runItemHTML(r);});
   if(S.quests.length||S.runs.length)h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="export">Export data (JSON)</button></div>`;
+  return h;
+}
+function pinCardHTML(p){
+  const sel=S.sel===p.key,d=dist(player,p);
+  return `<div class="qc"><div class="qch"><b>${esc(p.kind==='pool'?p.title:p.title)}</b>${sel?'<span class="qsel">SELECTED</span>':''}</div>
+    <div class="qsub" style="margin-top:6px">${esc(pinLabel(p))}</div>
+    <div class="qsub">+${p.xp} XP · ${p.places} place${p.places>1?'s':''} · ${p.tasks} tasks · ${fmtD(d)} away${d<=CATCH_RANGE?' · in range':''}</div>
+    <div class="qrow"><button class="btn sm${sel?' ghost':''}" data-act="qsel" data-k="${esc(p.key)}">${sel?'Unselect':'Select'}</button><button class="btn ghost sm" data-act="qmap" data-k="${esc(p.key)}">Show on map</button></div></div>`;
+}
+function playerListHTML(h){
+  const R=S.active,free=S.quests.filter(q=>!jUses(q.id));
+  const nxt=R?[]:PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b));
+  const xpq=R?[]:PINS.filter(x=>x.kind==='pool').sort((a,b)=>dist(player,a)-dist(player,b));
+  h+=`<div class="qh3">Next up</div>`;
+  if(R)h+=`<div class="qsub" style="margin-top:8px">Finish or abort your active quest first.</div>`;
+  else if(!nxt.length)h+=`<div class="qsub" style="margin-top:8px;line-height:1.7">Nothing is available right now. Check your journey limits (level, XP or waiting time).</div>`;
+  nxt.forEach(p=>{h+=pinCardHTML(p);});
+  if(xpq.length||free.length){
+    h+=`<div class="qh3">Unlocked</div>`;
+    xpq.forEach(p=>{h+=pinCardHTML(p);});
+    free.forEach(q=>{
+      h+=`<div class="qc"><div class="qch"><b>${esc(q.name)}</b></div>
+        <div class="qsub" style="margin-top:6px">${q.locs.length} places · ${questTaskCount(q)} tasks${q.locs.length>1?' · ~'+fmtD(routeLen(q)):''}</div>
+        <div class="qrow"><button class="btn sm" data-act="start" data-id="${q.id}"${R?' disabled':''}>Start</button></div></div>`;
+    });
+  }
+  h+=`<div class="qh3">Sessions</div>`;
+  if(!S.runs.length)h+=`<div class="qsub" style="margin-top:8px">Every quest you start is logged here.</div>`;
+  S.runs.forEach(r=>{h+=runItemHTML(r);});
+  if(S.runs.length||S.quests.length)h+=`<div class="qrow" style="margin-top:22px"><button class="btn ghost sm" data-act="export">Export data (JSON)</button></div>`;
   return h;
 }
 function editHTML(){
@@ -1253,6 +1253,8 @@ $('qdB').addEventListener('click',e=>{
     case 'new':if(DEV)openEditor({id:qid(),name:'',createdAt:Date.now(),locs:[]},true);break;
     case 'edit':{const q=S.quests.find(x=>x.id===id);if(DEV&&q)openEditor(clone(q),false);break;}
     case 'start':startQuest(id);break;
+    case 'qsel':selectPin(b.dataset.k);break;
+    case 'qmap':{const p=PINS.find(x=>x.key===b.dataset.k);if(p){$('qd').classList.remove('open');focusPin(p);}break;}
     case 'focus':$('qd').classList.remove('open');focusTarget();break;
     case 'sheet':$('qd').classList.remove('open');openSheet();break;
     case 'abort':abortQuestUI();break;
@@ -1776,15 +1778,16 @@ function jPins(){
   return out.concat(poolSpawns(),items);
 }
 const BANG='<svg viewBox="0 0 10 10"><path d="M5 .6L9.4 5L5 9.4L.6 5Z"/></svg>',PLUS='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="8"/><rect x="1" y="4.1" width="8" height="1.8"/></svg>';
-const pinHTML=(p,near)=>`<div class="jwrap${near?' near':''}"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='pool'?PLUS:BANG}</b></div></div>`;
+const pinHTML=(p,near,sel)=>`<div class="jwrap${near?' near':''}"><div class="jpin ${p.kind}${near?' near':''}${sel?' sel':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='pool'?'XP':BANG}</b></div></div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
+  if(S.sel&&!S.active&&!(DEV&&ED)&&!PINS.some(x=>x.key===S.sel)){S.sel=null;save();}   // done or gone: nothing is selected any more
   const keep=new Set(PINS.map(p=>p.key));
   for(const k in pinMarkers)if(!keep.has(k)){pinMarkers[k].mk.remove();delete pinMarkers[k];}
   PINS.forEach(p=>{
-    const near=dist(player,p)<=CATCH_RANGE;let o=pinMarkers[p.key];
-    if(!o){o=mkMarker(pinHTML(p,near),p.lng,p.lat,()=>{if(PICK)return;tapPin(o.pin);},6);o.near=near;pinMarkers[p.key]=o;}
-    else if(o.near!==near){o.near=near;o.el.innerHTML=pinHTML(p,near);}
+    const near=dist(player,p)<=CATCH_RANGE,sel=p.key===S.sel;let o=pinMarkers[p.key];
+    if(!o){o=mkMarker(pinHTML(p,near,sel),p.lng,p.lat,()=>{if(PICK)return;tapPin(o.pin);},sel?7:6);o.near=near;o.sel=sel;pinMarkers[p.key]=o;}
+    else if(o.near!==near||o.sel!==sel){o.near=near;o.sel=sel;o.el.style.zIndex=sel?7:6;o.el.innerHTML=pinHTML(p,near,sel);}
     o.pin=p;
   });
 }
@@ -1801,6 +1804,11 @@ function pinTick(){
   if(!p)return;
   closePop();startQuest(p.q.id,p.ctx,p.q);
 }
+function selectPin(key){S.sel=(S.sel===key)?null:key;save();refreshPins();renderMission();if($('qd').classList.contains('open'))renderQD();}
+function missionTarget(){
+  const sel=S.sel&&PINS.find(x=>x.key===S.sel&&x.kind!=='item');
+  return sel||PINS.filter(x=>x.kind==='stage'||x.kind==='side').sort((a,b)=>dist(player,a)-dist(player,b))[0]||null;
+}
 function pinLabel(p){return p.kind==='item'?'Mystery item':p.kind==='stage'?`Stage ${jPad(p.stage)} · ${p.jname}`:p.kind==='side'?`Side quest · ${p.jname}`:'Repeatable XP quest';}
 function showPop(p,focus){
   const d=dist(player,p),inR=d<=CATCH_RANGE,item=p.kind==='item';
@@ -1812,7 +1820,7 @@ function showPop(p,focus){
   $('qpS').textContent=item||p.kind==='pool'?'':'Quest · '+p.qname;
   $('qpR').innerHTML=`<div><b class="pgold">+${p.xp}</b><span>XP</span></div>${item?'':`<div><b>${p.places}</b><span>Places</span></div><div><b>${p.tasks}</b><span>Tasks</span></div>`}<div><b>${fmtD(d)}</b><span>Away</span></div>`;
   $('qpN').textContent=inR?(item?'You are close. Tap Collect.':'You are here. Tap Start.'):`Get within ${CATCH_RANGE} m of the marker, tap it ${item?'and throw to collect it':'to start the quest'}.${p.route?' Route about '+fmtD(p.route)+'.':''}`;
-  $('qpB').innerHTML=`<button class="btn sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${inR?`<button class="btn sm" data-act="pcatch" data-k="${esc(p.key)}">${item?'Collect':'Start'}</button>`:''}${DEV&&!item?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
+  $('qpB').innerHTML=`${item?'':`<button class="btn sm${S.sel===p.key?' ghost':''}" data-act="psel" data-k="${esc(p.key)}">${S.sel===p.key?'Selected · unselect':'Select'}</button>`}<button class="btn ghost sm" data-act="pshow" data-k="${esc(p.key)}">Show on map</button>${inR?`<button class="btn sm" data-act="pcatch" data-k="${esc(p.key)}">${item?'Collect':'Start'}</button>`:''}${DEV&&!item?`<button class="btn ghost sm" data-act="pstart" data-k="${esc(p.key)}">Start now (dev)</button>`:''}`;
   $('qpop').classList.add('open');
   if(focus)focusPin(p);
 }
@@ -1827,6 +1835,7 @@ $('qpop').addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;
   const p=PINS.find(x=>x.key===b.dataset.k);if(!p)return;
   if(b.dataset.act==='pshow')focusPin(p);
+  else if(b.dataset.act==='psel'){selectPin(p.key);showPop(p);}
   else if(b.dataset.act==='pcatch'){if(p.kind==='item')openCatch(p);else startFromPin(p);}
   else if(b.dataset.act==='pstart'){closePop();startQuest(p.q.id,Object.assign({},p.ctx,{auto:false}),p.q);}
 });
@@ -2212,13 +2221,14 @@ updateHud();setReadout();renderMission();
 if(hadActive&&!RESUME)setTimeout(()=>toast('Quest aborted<small>The app was closed before you finished</small>',4200),700);
 /* remember the view so a reload (Chrome discarding the tab in the background) lands where you were */
 const LSV='wildwalk.view';
-function saveView(){try{const c=map.getCenter();localStorage.setItem(LSV,JSON.stringify({t:Date.now(),f:document.body.dataset.follow,lng:c.lng,lat:c.lat,z:map.getZoom(),sheet:$('qsheet').classList.contains('open')}));}catch(e){}}
+function saveView(){try{const c=map.getCenter();localStorage.setItem(LSV,JSON.stringify({t:Date.now(),f:document.body.dataset.follow,lng:c.lng,lat:c.lat,z:map.getZoom(),sheet:$('qsheet').classList.contains('open'),sim:SIM}));}catch(e){}}
 document.addEventListener('visibilitychange',()=>{if(document.hidden)saveView();});
 addEventListener('pagehide',saveView);
 setInterval(()=>{if(!document.hidden)saveView();},5000);
 {const v=readJSON(LSV);
  if(v&&Date.now()-v.t<12*3600e3){
   if(v.f==='0'){document.body.dataset.follow='0';map.jumpTo({center:[v.lng,v.lat],zoom:v.z});}
+  if(v.sim){hideGate();setSim(true);}
   if(RESUME){lastPt=null;onQuestChange();updateHud();if(v.sheet)openSheet();setTimeout(()=>toast('Welcome back<small>Your quest is still running</small>',3000),700);}
  }else if(RESUME){lastPt=null;onQuestChange();updateHud();}}
 refresh();maybeFetchStops();
@@ -2229,7 +2239,7 @@ refresh();maybeFetchStops();
     state=p.state;
     p.onchange=()=>{if(p.state==='granted'&&!gotFix&&!SIM)startGPS();};
   }catch(e){}
-  if(state!=='granted')showGate(state==='denied'?'denied':'ask');
+  if(state!=='granted'&&!SIM)showGate(state==='denied'?'denied':'ask');
   startGPS();
 })();
 setInterval(()=>{refresh();ensureMission();questTick();renderMission();},10000);
