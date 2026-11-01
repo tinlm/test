@@ -105,6 +105,8 @@
   @keyframes float{0%,100%{transform:translate(-50%,-50%)}50%{transform:translate(-50%,calc(-50% - 6px))}}
   .btn{border:0;padding:15px 44px;font:600 13px var(--sans);letter-spacing:.24em;text-transform:uppercase;background:#fff;color:#000}
   .btn{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-select:none}
+  body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+  input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
   .btn:disabled{opacity:.5}
   .gate .gs{font:400 11px var(--mono);letter-spacing:.06em;color:#c7cfd8;min-height:1.4em}
   .stop.supply{border-style:dashed}
@@ -147,7 +149,7 @@
   .tel{letter-spacing:.14em;white-space:nowrap}
   .tel span{margin-right:16px}
   .tel b{color:#fff;font-weight:500}
-  .credit{position:absolute;left:max(16px,env(safe-area-inset-left,0px));bottom:calc(5px + env(safe-area-inset-bottom,0px));font:400 8px var(--mono);letter-spacing:.1em;color:#5d6670;text-transform:none}
+  .credit{position:absolute;left:0;right:0;text-align:center;bottom:calc(5px + env(safe-area-inset-bottom,0px));font:400 8px var(--mono);letter-spacing:.1em;color:#5d6670;text-transform:none}
   .ret{pointer-events:auto;background:transparent;color:#fff;border:1px solid #ffffff88;padding:10px 14px;font:500 11px var(--sans);letter-spacing:.22em;text-transform:uppercase}
   .cap{position:absolute;left:0;right:0;bottom:calc(var(--bar) + 30px + env(safe-area-inset-bottom,0px));text-align:center;font:500 13px var(--sans);letter-spacing:.5em;text-indent:.5em;text-transform:uppercase;color:#fff;opacity:0}
   body.spun .cap{animation:cap 6s ease 1}
