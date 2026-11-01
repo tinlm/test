@@ -591,6 +591,7 @@ const youEl=document.createElement('div');youEl.id='you';youEl.innerHTML='<div c
 function setReadout(){$('mode').textContent=(DEV?'DEV · ':'')+(S.active?fmtT(Date.now()-S.active.startedAt)+(SIM?' · SIM':''):(SIM?'SIM':(gotFix?'GPS LOCK':'LOCATING')));}
 function setPlayer(lat,lng,pan){
   player={lat,lng};
+  try{localStorage.setItem('wildwalk.lastfix',JSON.stringify({lat,lng}));}catch(e){}   // sim or real: a reload starts here
   me.mk.setLngLat([lng,lat]);
   const src=map.getSource('range');if(src)src.setData(circleLine(player,CATCH_RANGE));
   if(pan)map.easeTo({center:[lng,lat],duration:600});
