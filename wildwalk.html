@@ -212,13 +212,12 @@
   .jpin.pool{border-radius:50%;width:22px;height:22px;margin:2px;font-size:14px}
   .jpin.item{border-radius:0;color:#fff;background:#000;border:2px solid #000;box-shadow:0 0 0 1px #ffffff55;font-size:14px}
   /* quests: one ring that leaves the border, same speed as the current-location ring */
-  .jpin.stage::after,.jpin.side::after,.jpin.pool::after{content:"";position:absolute;inset:-9px;border:1px solid currentColor;border-radius:0;animation:ping 2.4s ease-out infinite;pointer-events:none}
+  .jpin.stage::after,.jpin.side::after,.jpin.pool::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:0;animation:ping 2.4s ease-out infinite;pointer-events:none}
   /* in range: the marker hovers and a dashed reticle turns around it */
-  .jpin.near:not(.item)::before{content:"";position:absolute;inset:-6px;border:1.5px dashed currentColor;border-radius:0;animation:spin 5s linear infinite;pointer-events:none}
-  .jpin.pool::after,.jpin.pool.near::before{border-radius:50%}
-  @keyframes spin{to{transform:rotate(360deg)}}
+  .jpin.near:not(.item){background:#fff;color:#000}
+  .jpin.pool::after{border-radius:50%}
   .jpin.item.near{box-shadow:0 0 0 1px #ffffff99,0 0 10px 2px #ffffff55}
-  @media (prefers-reduced-motion:reduce){.jpin::after,.jpin::before,.jwrap{animation:none!important}}
+  @media (prefers-reduced-motion:reduce){.jpin::after,.jwrap{animation:none!important}}
   .jpin.item.pic b{width:100%;height:100%;border-radius:0;overflow:hidden;display:block}
   .jpin.item.pic img{width:100%;height:100%;object-fit:cover;display:block}
   .beast.pic{filter:none;font-size:0}
@@ -1724,19 +1723,27 @@ function poolSpawns(now=Date.now()){
 }
 /* Items are anchored once, on the line between where the player is and the quest: the first one a walk away from home, the next closer to the quest, never right on top of it. */
 function itemAnchor(key,idx,n,c){
+  /* Items are the breadcrumbs of a walk: the first is a short stroll out of the door (~150-250 m, enough to
+     get you outside), each next one is a longer leg toward the quest, and they never sit on top of each other.
+     Order follows the item list, so the story reads in the order you walk it. Fixed once, then kept. */
   if(!S.ipos)S.ipos={};
-  if(S.ipos[key])return S.ipos[key];
+  const K=key+'~2';
+  if(S.ipos[K])return S.ipos[K];
   if(!gotFix&&!SIM)return null;
-  const P=player,D=dist(P,c),k=idx+1,cnt=n,cl=Math.cos(P.lat*Math.PI/180);
-  let sd=D*k/(cnt+1);                                   // distance from the player
-  if(D>=130)sd=Math.max(60,Math.min(sd,350*k,D-70));    // not too close to the player or to the quest
-  const f=D>0?sd/D:0,rnd=mulberry(hash(hs(key),7,3)),sgn=idx%2?1:-1;
-  const dx=c.lng-P.lng,dy=c.lat-P.lat,len=Math.hypot(dx*cl,dy)||1;
-  const at=side=>({lat:P.lat+dy*f+(dx*cl/len)*side/111320,lng:P.lng+dx*f-(dy/len)*side/(111320*cl)});
+  const P=player,cl=Math.cos(P.lat*Math.PI/180),D=dist(P,c);
+  const ux=D?((c.lng-P.lng)*cl*111320)/D:0,uy=D?((c.lat-P.lat)*111320)/D:1;   // unit vector to the quest (m)
+  const MIN=260;                                                                // wanted gap between consecutive stops
+  const a=[];                                                                  // distance along the route per item
+  const first=Math.min(230,Math.max(130,D/(n+2)));
+  for(let k=0;k<n;k++)a.push(D>=first+MIN*n+90?Math.min(first+k*MIN*1.4,D-90-(n-1-k)*MIN*.6):D*(k+1)/(n+1));
+  const gap=Math.min(...a.map((v,k)=>v-(k?a[k-1]:0)).concat(D-a[n-1]));
+  const amp=Math.max(70,Math.min(320,Math.sqrt(Math.max(0,MIN*MIN-gap*gap))/2+40));   // swing wide enough to keep the gap
+  const rnd=mulberry(hash(hs(key),7,3)),wob=.9+rnd()*.25;
   const others=Object.values(S.ipos);
-  let side=sgn*(130+rnd()*50),pos=at(side);            // zig-zag: items alternate sides of the route
-  for(let t=1;t<=12&&others.some(o=>dist(o,pos)<320);t++){side=(t%2?-1:1)*Math.sign(side||1)*(Math.abs(side)+(t%2?0:70));pos=at(side);}   // keep every item at least ~320 m from every other
-  return (S.ipos[key]=pos);
+  const at=(side,al)=>({lat:P.lat+(uy*al+ux*side)/111320,lng:P.lng+(ux*al-uy*side)/(111320*cl)});
+  let side=(idx%2?1:-1)*amp*wob,al=a[idx],pos=at(side,al);
+  for(let t=1;t<=10&&others.some(o=>dist(o,pos)<MIN);t++){side*=1.25;al+=(t%2?40:-40);pos=at(side,al);}
+  return (S.ipos[K]=pos);
 }
 function itemSpawns(){
   const out=[];
@@ -1767,7 +1774,7 @@ function jPins(){
   }));
   return out.concat(poolSpawns(),items);
 }
-const BANG='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="5.2"/><rect x="4.1" y="7.4" width="1.8" height="1.6"/></svg>',PLUS='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="8"/><rect x="1" y="4.1" width="8" height="1.8"/></svg>';
+const BANG='<svg viewBox="0 0 10 10"><path d="M5 .6L9.4 5L5 9.4L.6 5Z"/></svg>',PLUS='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="8"/><rect x="1" y="4.1" width="8" height="1.8"/></svg>';
 const pinHTML=(p,near)=>`<div class="jwrap${near?' near':''}"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='pool'?PLUS:BANG}</b></div></div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
