@@ -203,15 +203,12 @@
   .jgrp{margin-top:12px;display:flex;align-items:center;gap:10px;font:400 9px var(--mono);letter-spacing:.18em;color:var(--gold);text-transform:uppercase}
   .jgrp span{flex:1}
   .jgrp select.qi.sel{flex:1.3;padding:8px 6px;font-size:13px}
-  .jpin{position:relative;width:34px;height:34px;display:grid;place-items:center;background:#000;border:1px solid #fff;font:500 15px var(--sans);color:#fff;cursor:pointer}
-  .jpin.stage{border-width:2px}
-  .jpin.side{border-style:dashed}
-  .jpin.pool{border-radius:50%;width:28px;height:28px;font-size:17px}
   .jwrap{position:relative;width:26px;height:26px}
   .jwrap.near{animation:hover 1.6s ease-in-out infinite}
   .jpin{position:relative;width:26px;height:26px;display:grid;place-items:center;background:#000;border:1px solid #fff;font:500 13px var(--sans);color:#fff;cursor:pointer}
-  .jpin.stage{border-width:2px}
-  .jpin.side{border-style:dashed}
+  .jpin.stage,.jpin.side{border-style:dashed}
+  .jpin b{display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-weight:400;line-height:1}
+  .jpin svg{display:block;width:12px;height:12px;fill:currentColor}
   .jpin.pool{border-radius:50%;width:22px;height:22px;margin:2px;font-size:14px}
   .jpin.item{border-radius:0;color:#fff;background:#000;border:2px solid #000;box-shadow:0 0 0 1px #ffffff55;font-size:14px}
   /* quests: one ring that leaves the border, same speed as the current-location ring */
@@ -1736,9 +1733,9 @@ function itemAnchor(key,idx,n,c){
   const f=D>0?sd/D:0,rnd=mulberry(hash(hs(key),7,3)),sgn=idx%2?1:-1;
   const dx=c.lng-P.lng,dy=c.lat-P.lat,len=Math.hypot(dx*cl,dy)||1;
   const at=side=>({lat:P.lat+dy*f+(dx*cl/len)*side/111320,lng:P.lng+dx*f-(dy/len)*side/(111320*cl)});
-  let side=sgn*(80+rnd()*40),pos=at(side);              // zig-zag: items alternate sides of the route
   const others=Object.values(S.ipos);
-  for(let t=0;t<6&&others.some(o=>dist(o,pos)<160);t++){side+=sgn*70;pos=at(side);}
+  let side=sgn*(130+rnd()*50),pos=at(side);            // zig-zag: items alternate sides of the route
+  for(let t=1;t<=12&&others.some(o=>dist(o,pos)<320);t++){side=(t%2?-1:1)*Math.sign(side||1)*(Math.abs(side)+(t%2?0:70));pos=at(side);}   // keep every item at least ~320 m from every other
   return (S.ipos[key]=pos);
 }
 function itemSpawns(){
@@ -1770,7 +1767,8 @@ function jPins(){
   }));
   return out.concat(poolSpawns(),items);
 }
-const pinHTML=(p,near)=>`<div class="jwrap${near?' near':''}"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='stage'?'★':p.kind==='side'?'◆':'+'}</b></div></div>`;
+const BANG='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="5.2"/><rect x="4.1" y="7.4" width="1.8" height="1.6"/></svg>',PLUS='<svg viewBox="0 0 10 10"><rect x="4.1" y="1" width="1.8" height="8"/><rect x="1" y="4.1" width="8" height="1.8"/></svg>';
+const pinHTML=(p,near)=>`<div class="jwrap${near?' near':''}"><div class="jpin ${p.kind}${near?' near':''}${p.kind==='item'&&p.item.img?' pic':''}"><b>${p.kind==='item'?(p.item.img?`<img alt="" src="${p.item.img}">`:esc(p.item.icon||'◆')):p.kind==='pool'?PLUS:BANG}</b></div></div>`;
 function refreshPins(){
   PINS=(DEV&&ED)?[]:jPins();
   const keep=new Set(PINS.map(p=>p.key));
