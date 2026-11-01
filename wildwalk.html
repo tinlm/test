@@ -212,7 +212,8 @@
   .jpin.pool{border-radius:50%;width:22px;height:22px;margin:2px;font-size:14px}
   .jpin.item{border-radius:0;color:#fff;background:#000;border:2px solid #000;box-shadow:0 0 0 1px #ffffff55;font-size:14px}
   /* quests: one ring that leaves the border, same speed as the current-location ring */
-  .jpin.stage::after,.jpin.side::after,.jpin.pool::after{content:"";position:absolute;inset:-9px;border:1px solid #fff;border-radius:0;animation:ping 2.4s ease-out infinite;pointer-events:none}
+  .jpin.stage::after,.jpin.side::after,.jpin.pool::after{content:"";position:absolute;inset:0;border:1px solid #fff;border-radius:0;animation:pingq 2.4s ease-out infinite;pointer-events:none}
+  @keyframes pingq{from{transform:scale(.3);opacity:.9}to{transform:scale(2.5);opacity:0}}
   /* in range: the marker hovers and a dashed reticle turns around it */
   .jpin.near:not(.item){background:#fff;color:#000}
   .jpin.pool::after{border-radius:50%}
@@ -2204,10 +2205,22 @@ $('ret').onclick=endOrbit;
 
 /* ================= Boot ================= */
 const hadActive=!!S.active;
-if(hadActive)abortQuest('closed');   // closing or reloading the app mid-quest aborts it
+const RESUME=hadActive&&Date.now()-(S.active.seen||0)<12*3600e3;   // the browser may unload the page while you use another app: pick up where you were
+if(hadActive&&!RESUME)abortQuest('closed');
 document.body.dataset.follow='1';
 updateHud();setReadout();renderMission();
-if(hadActive)setTimeout(()=>toast('Quest aborted<small>The app was closed before you finished</small>',4200),700);
+if(hadActive&&!RESUME)setTimeout(()=>toast('Quest aborted<small>The app was closed before you finished</small>',4200),700);
+/* remember the view so a reload (Chrome discarding the tab in the background) lands where you were */
+const LSV='wildwalk.view';
+function saveView(){try{const c=map.getCenter();localStorage.setItem(LSV,JSON.stringify({t:Date.now(),f:document.body.dataset.follow,lng:c.lng,lat:c.lat,z:map.getZoom(),sheet:$('qsheet').classList.contains('open')}));}catch(e){}}
+document.addEventListener('visibilitychange',()=>{if(document.hidden)saveView();});
+addEventListener('pagehide',saveView);
+setInterval(()=>{if(!document.hidden)saveView();},5000);
+{const v=readJSON(LSV);
+ if(v&&Date.now()-v.t<12*3600e3){
+  if(v.f==='0'){document.body.dataset.follow='0';map.jumpTo({center:[v.lng,v.lat],zoom:v.z});}
+  if(RESUME){lastPt=null;onQuestChange();updateHud();if(v.sheet)openSheet();setTimeout(()=>toast('Welcome back<small>Your quest is still running</small>',3000),700);}
+ }else if(RESUME){lastPt=null;onQuestChange();updateHud();}}
 refresh();maybeFetchStops();
 (async()=>{
   let state='prompt';
